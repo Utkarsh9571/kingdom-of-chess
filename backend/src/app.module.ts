@@ -6,6 +6,7 @@ import { DatabaseModule } from './database/database.module';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { GatewayModule } from './modules/gateway/gateway.module';
+import { TournamentsModule } from './modules/tournaments/tournaments.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { GatewayModule } from './modules/gateway/gateway.module';
     UsersModule,
     AuthModule,
     GatewayModule,
+    TournamentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
