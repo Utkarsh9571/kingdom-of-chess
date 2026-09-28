@@ -127,4 +127,30 @@ export const api = {
     ),
 
   getParticipants: (id: string) => request<Participant[]>(`/tournaments/${id}/participants`),
+
+  // Matches
+  getMatch: (id: string) => request<MatchDetails>(`/matches/${id}`),
 };
+
+export interface MatchDetails {
+  id: string;
+  tournamentId: string;
+  tournamentName: string;
+  timeControl: string;
+  initialTimeSeconds: number;
+  incrementSeconds: number;
+  status: 'in_progress' | 'completed' | 'abandoned';
+  result?: 'white_win' | 'black_win' | 'draw' | null;
+  reason?: string | null;
+  winnerId?: string | null;
+  currentFen: string;
+  pgn: string;
+  whitePlayer: { id: string; name: string; email: string };
+  blackPlayer: { id: string; name: string; email: string };
+  whiteTimeRemainingMs: number;
+  blackTimeRemainingMs: number;
+  activeTurn: 'w' | 'b';
+  userRole: 'white' | 'black' | 'coach';
+  createdAt: string;
+}
+

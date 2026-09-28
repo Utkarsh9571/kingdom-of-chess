@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX "unique_active_white_player" ON "matches" USING btree ("white_player_id") WHERE status = 'in_progress';--> statement-breakpoint
+CREATE UNIQUE INDEX "unique_active_black_player" ON "matches" USING btree ("black_player_id") WHERE status = 'in_progress';

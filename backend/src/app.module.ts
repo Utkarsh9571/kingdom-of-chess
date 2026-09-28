@@ -7,6 +7,8 @@ import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { GatewayModule } from './modules/gateway/gateway.module';
 import { TournamentsModule } from './modules/tournaments/tournaments.module';
+import { MatchmakingModule } from './modules/matchmaking/matchmaking.module';
+import { MatchesModule } from './modules/matches/matches.module';
 
 @Module({
   imports: [
@@ -19,6 +21,8 @@ import { TournamentsModule } from './modules/tournaments/tournaments.module';
     AuthModule,
     GatewayModule,
     TournamentsModule,
+    MatchmakingModule,
+    MatchesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

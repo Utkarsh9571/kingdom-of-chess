@@ -1,4 +1,5 @@
 import { pgTable, uuid, varchar, text, timestamp, integer, pgEnum, uniqueIndex, index } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 export const userRoleEnum = pgEnum('user_role', ['COACH', 'STUDENT']);
 export const tournamentStatusEnum = pgEnum('tournament_status', ['draft', 'open', 'ongoing', 'completed']);
@@ -67,6 +68,8 @@ export const matches = pgTable('matches', {
   index('match_status_idx').on(table.status),
   index('match_white_player_idx').on(table.whitePlayerId),
   index('match_black_player_idx').on(table.blackPlayerId),
+  uniqueIndex('unique_active_white_player').on(table.whitePlayerId).where(sql`status = 'in_progress'`),
+  uniqueIndex('unique_active_black_player').on(table.blackPlayerId).where(sql`status = 'in_progress'`),
 ]);
 
 // 5. Match Moves Table
