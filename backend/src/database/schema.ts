@@ -85,3 +85,11 @@ export const matchMoves = pgTable('match_moves', {
 }, (table) => [
   index('move_match_ply_idx').on(table.matchId, table.ply),
 ]);
+
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+export type Tournament = typeof tournaments.$inferSelect;
+export type NewTournament = typeof tournaments.$inferInsert;
+export type TournamentParticipant = typeof tournamentParticipants.$inferSelect;
+export type Match = typeof matches.$inferSelect;
+export type MatchMove = typeof matchMoves.$inferSelect;
