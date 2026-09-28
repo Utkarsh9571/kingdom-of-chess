@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: kingdom-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}
+      POSTGRES_DB: ${POSTGRES_DB:-kingdom_chess}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - kingdom_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  kingdom_postgres_data:
