@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -15,6 +15,9 @@ import {
   Sparkles,
   Loader2,
   Trophy,
+  Crown,
+  Medal,
+  Info,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Navbar } from '@/components/Navbar';
@@ -28,6 +31,7 @@ export default function StudentTournamentDetailsPage() {
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const {
+    socket,
     isQueueing,
     queuedTournamentId,
     queueError,
@@ -38,6 +42,12 @@ export default function StudentTournamentDetailsPage() {
   } = useSocket();
 
   const isCurrentTournamentQueued = isQueueing && queuedTournamentId === id;
+
+  // Current logged in user for highlighting in leaderboard
+  const { data: currentUser } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => api.getMe(),
+  });
 
   const {
     data: tournament,
@@ -50,11 +60,39 @@ export default function StudentTournamentDetailsPage() {
     enabled: !!id,
   });
 
+  // Dynamic Leaderboard Query
+  const {
+    data: leaderboard,
+    isLoading: isLeaderboardLoading,
+    isError: isLeaderboardError,
+    error: leaderboardError,
+  } = useQuery({
+    queryKey: ['tournament-leaderboard', id],
+    queryFn: () => api.getLeaderboard(id),
+    enabled: !!id && (tournament?.isEnrolled || currentUser?.role === 'COACH'),
+    retry: 1,
+  });
+
+  // Socket listener to auto-refresh leaderboard on match completion
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    const handleMatchEndedNotice = () => {
+      queryClient.invalidateQueries({ queryKey: ['tournament-leaderboard', id] });
+    };
+
+    socket.on('match:ended', handleMatchEndedNotice);
+    return () => {
+      socket.off('match:ended', handleMatchEndedNotice);
+    };
+  }, [socket, isConnected, id, queryClient]);
+
   const joinMutation = useMutation({
     mutationFn: () => api.joinTournament(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tournament', id] });
       queryClient.invalidateQueries({ queryKey: ['tournaments'] });
+      queryClient.invalidateQueries({ queryKey: ['tournament-leaderboard', id] });
       setMsg({ type: 'success', text: 'You are now registered for this tournament!' });
     },
     onError: (err: any) => {
@@ -291,12 +329,170 @@ export default function StudentTournamentDetailsPage() {
               </div>
             </div>
 
+            {/* DYNAMIC TOURNAMENT LEADERBOARD SECTION */}
+            <div className="rounded-3xl border border-brand-border bg-white p-6 sm:p-8 shadow-soft space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-brand-border pb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Trophy className="h-5 w-5 text-brand-orange" />
+                    <h2 className="text-xl font-extrabold text-brand-navy">Tournament Leaderboard</h2>
+                  </div>
+                  <p className="text-xs text-brand-text-muted font-medium mt-0.5">
+                    Live standings calculated from completed match results
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 text-[11px] font-bold text-brand-text-muted bg-brand-cream px-3 py-1.5 rounded-full border border-brand-border self-start sm:self-auto">
+                  <Info className="h-3.5 w-3.5 text-brand-teal" />
+                  <span>Win = 1.0 pt • Draw = 0.5 pt • Loss = 0 pt</span>
+                </div>
+              </div>
+
+              {/* Leaderboard Loading */}
+              {isLeaderboardLoading && (
+                <div className="py-12 flex flex-col items-center justify-center space-y-3">
+                  <Loader2 className="h-7 w-7 text-brand-orange animate-spin" />
+                  <p className="text-xs font-bold text-brand-text-muted">Loading live standings...</p>
+                </div>
+              )}
+
+              {/* Leaderboard Error */}
+              {isLeaderboardError && !tournament.isEnrolled && currentUser?.role !== 'COACH' && (
+                <div className="rounded-2xl border border-brand-border bg-brand-cream p-6 text-center text-xs font-medium text-brand-text-muted">
+                  Enroll in this tournament to view the live standings and player rankings.
+                </div>
+              )}
+
+              {isLeaderboardError && (tournament.isEnrolled || currentUser?.role === 'COACH') && (
+                <div className="rounded-2xl border border-destructive/20 bg-brand-pink-light p-4 text-xs font-bold text-destructive">
+                  Unable to load tournament leaderboard: {(leaderboardError as Error)?.message}
+                </div>
+              )}
+
+              {/* Leaderboard Table */}
+              {!isLeaderboardLoading && leaderboard && (
+                <div className="space-y-4">
+                  {leaderboard.entries.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-brand-border p-10 text-center text-xs text-brand-text-muted font-medium">
+                      No competitors currently enrolled to display in standings.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="border-b border-brand-border text-brand-text-muted font-bold uppercase tracking-wider text-[11px]">
+                          <tr>
+                            <th className="py-3 px-4 w-16">Rank</th>
+                            <th className="py-3 px-4">Player</th>
+                            <th className="py-3 px-4 text-center">Played</th>
+                            <th className="py-3 px-4 text-center">Wins</th>
+                            <th className="py-3 px-4 text-center">Draws</th>
+                            <th className="py-3 px-4 text-center">Losses</th>
+                            <th className="py-3 px-4 text-right">Points</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-brand-border/60 font-medium">
+                          {leaderboard.entries.map((entry) => {
+                            const isMe = currentUser?.id === entry.playerId;
+                            const isFirst = entry.rank === 1 && entry.points > 0;
+                            const isSecond = entry.rank === 2 && entry.points > 0;
+                            const isThird = entry.rank === 3 && entry.points > 0;
+
+                            return (
+                              <tr
+                                key={entry.playerId}
+                                className={`transition-colors ${
+                                  isMe
+                                    ? 'bg-brand-orange-light/40 border-l-4 border-l-brand-orange font-bold'
+                                    : 'hover:bg-brand-cream/50'
+                                }`}
+                              >
+                                <td className="py-3.5 px-4 font-extrabold text-sm">
+                                  <div className="flex items-center gap-1.5">
+                                    {isFirst ? (
+                                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 text-amber-800 border border-amber-300 font-extrabold text-xs shadow-sm">
+                                        <Crown className="h-3.5 w-3.5 text-amber-600 inline" />
+                                      </span>
+                                    ) : isSecond ? (
+                                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-700 border border-slate-300 font-extrabold text-xs">
+                                        2
+                                      </span>
+                                    ) : isThird ? (
+                                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-50 text-amber-900 border border-amber-200 font-extrabold text-xs">
+                                        3
+                                      </span>
+                                    ) : (
+                                      <span className="text-brand-text-muted pl-1">
+                                        #{entry.rank}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+
+                                <td className="py-3.5 px-4">
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-brand-cream-dark text-brand-navy font-bold text-xs">
+                                      ♟
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-extrabold text-brand-navy text-sm">
+                                        {entry.playerName}
+                                      </span>
+                                      {isMe && (
+                                        <span className="rounded-full bg-brand-orange px-2 py-0.5 text-[9px] font-extrabold text-white uppercase tracking-wider">
+                                          You
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </td>
+
+                                <td className="py-3.5 px-4 text-center font-bold text-brand-navy">
+                                  {entry.matchesPlayed}
+                                </td>
+
+                                <td className="py-3.5 px-4 text-center font-extrabold text-brand-teal">
+                                  {entry.wins}
+                                </td>
+
+                                <td className="py-3.5 px-4 text-center font-bold text-brand-text-muted">
+                                  {entry.draws}
+                                </td>
+
+                                <td className="py-3.5 px-4 text-center font-bold text-brand-text-muted">
+                                  {entry.losses}
+                                </td>
+
+                                <td className="py-3.5 px-4 text-right">
+                                  <span className="font-mono text-base font-extrabold text-brand-orange bg-brand-orange-light px-3 py-1 rounded-xl border border-brand-orange/30">
+                                    {entry.points.toFixed(1)}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  <div className="text-[11px] text-brand-text-muted font-medium pt-2 flex items-center justify-between border-t border-brand-border/60">
+                    <span>
+                      * Tiebreak Order: Total Points → Most Wins → Matches Played → Player Name.
+                    </span>
+                    <span className="font-bold text-brand-navy">
+                      Competition Ranking (1, 2, 2, 4)
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Enrolled Competitors Roster */}
             <div className="rounded-3xl border border-brand-border bg-white p-6 sm:p-8 shadow-soft space-y-6">
               <div>
                 <h2 className="text-xl font-extrabold text-brand-navy">Enrolled Competitors</h2>
                 <p className="text-xs text-brand-text-muted font-medium mt-0.5">
-                  Students ready to compete in {tournament.name}
+                  Students ready to compete in {tournament.name} ({tournament.participants?.length || 0})
                 </p>
               </div>
 

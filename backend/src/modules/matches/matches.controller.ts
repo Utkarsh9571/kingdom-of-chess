@@ -16,8 +16,6 @@ export class MatchesController {
   @Get(':id/moves')
   async getMatchMoves(@Param('id') id: string, @Req() req: any) {
     const user = req.user;
-    // Verify user is authorized to view this match
-    await this.matchesService.getMatchById(id, user.sub, user.role);
-    return this.matchesService.getMatchMoves(id);
+    return this.matchesService.getMatchMoves(id, user.sub, user.role);
   }
 }

@@ -85,4 +85,12 @@ export class TournamentsController {
   async getParticipants(@Param('id') id: string) {
     return this.tournamentsService.getParticipants(id);
   }
+
+  @Get(':id/leaderboard')
+  async getLeaderboard(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.tournamentsService.getLeaderboard(id, user.sub, user.role);
+  }
 }

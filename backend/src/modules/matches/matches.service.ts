@@ -144,7 +144,10 @@ export class MatchesService implements OnModuleDestroy {
     };
   }
 
-  async getMatchMoves(matchId: string) {
+  async getMatchMoves(matchId: string, userId?: string, role?: string) {
+    if (userId && role) {
+      await this.getMatchById(matchId, userId, role);
+    }
     return this.db
       .select()
       .from(schema.matchMoves)
@@ -267,7 +270,7 @@ export class MatchesService implements OnModuleDestroy {
           result = 'black_win';
           winnerId = match.blackPlayerId;
         }
-      } else if (chess.isStalemate() || chess.isDraw()) {
+      } else if (chess.isStalemate()) {
         status = 'completed';
         reason = 'stalemate';
         result = 'draw';

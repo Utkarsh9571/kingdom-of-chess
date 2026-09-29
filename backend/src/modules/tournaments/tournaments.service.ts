@@ -271,4 +271,172 @@ export class TournamentsService {
       isEnrolled: true,
     }));
   }
+
+  async getLeaderboard(tournamentId: string, userId: string, role: string) {
+    const [tournament] = await this.db
+      .select()
+      .from(schema.tournaments)
+      .where(eq(schema.tournaments.id, tournamentId))
+      .limit(1);
+
+    if (!tournament) {
+      throw new NotFoundException(`Tournament with ID "${tournamentId}" not found`);
+    }
+
+    // Authorization: Coach or enrolled student
+    if (role === 'STUDENT') {
+      const [enrollment] = await this.db
+        .select({ id: schema.tournamentParticipants.id })
+        .from(schema.tournamentParticipants)
+        .where(
+          and(
+            eq(schema.tournamentParticipants.tournamentId, tournamentId),
+            eq(schema.tournamentParticipants.userId, userId),
+          ),
+        )
+        .limit(1);
+
+      if (!enrollment) {
+        throw new ForbiddenException('You must be enrolled in this tournament to view its leaderboard');
+      }
+    } else if (role !== 'COACH') {
+      throw new ForbiddenException('Unauthorized to view this tournament leaderboard');
+    }
+
+    // 1. Fetch all enrolled participants (exclude private data such as email)
+    const participants = await this.db
+      .select({
+        userId: schema.users.id,
+        name: schema.users.name,
+      })
+      .from(schema.tournamentParticipants)
+      .innerJoin(schema.users, eq(schema.tournamentParticipants.userId, schema.users.id))
+      .where(eq(schema.tournamentParticipants.tournamentId, tournamentId));
+
+    // 2. Fetch all completed matches for this tournament
+    const completedMatches = await this.db
+      .select({
+        id: schema.matches.id,
+        whitePlayerId: schema.matches.whitePlayerId,
+        blackPlayerId: schema.matches.blackPlayerId,
+        result: schema.matches.result,
+        status: schema.matches.status,
+      })
+      .from(schema.matches)
+      .where(
+        and(
+          eq(schema.matches.tournamentId, tournamentId),
+          eq(schema.matches.status, 'completed'),
+        ),
+      );
+
+    // 3. Initialize statistics map for all enrolled participants (so 0-game players are included)
+    const statsMap = new Map<
+      string,
+      {
+        playerId: string;
+        playerName: string;
+        matchesPlayed: number;
+        wins: number;
+        draws: number;
+        losses: number;
+        points: number;
+      }
+    >();
+
+    for (const p of participants) {
+      statsMap.set(p.userId, {
+        playerId: p.userId,
+        playerName: p.name,
+        matchesPlayed: 0,
+        wins: 0,
+        draws: 0,
+        losses: 0,
+        points: 0,
+      });
+    }
+
+    // 4. Calculate results for completed matches
+    for (const match of completedMatches) {
+      const white = statsMap.get(match.whitePlayerId);
+      const black = statsMap.get(match.blackPlayerId);
+
+      if (white) white.matchesPlayed += 1;
+      if (black) black.matchesPlayed += 1;
+
+      if (match.result === 'white_win') {
+        if (white) {
+          white.wins += 1;
+          white.points += 1.0;
+        }
+        if (black) {
+          black.losses += 1;
+        }
+      } else if (match.result === 'black_win') {
+        if (black) {
+          black.wins += 1;
+          black.points += 1.0;
+        }
+        if (white) {
+          white.losses += 1;
+        }
+      } else if (match.result === 'draw') {
+        if (white) {
+          white.draws += 1;
+          white.points += 0.5;
+        }
+        if (black) {
+          black.draws += 1;
+          black.points += 0.5;
+        }
+      }
+    }
+
+    // 5. Deterministic sorting:
+    //    1. Points descending
+    //    2. Wins descending
+    //    3. Matches played descending
+    //    4. Player name ascending
+    const sorted = Array.from(statsMap.values()).sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      if (b.matchesPlayed !== a.matchesPlayed) return b.matchesPlayed - a.matchesPlayed;
+      return a.playerName.localeCompare(b.playerName);
+    });
+
+    // 6. Assign competition ranking (1, 2, 2, 4)
+    const rankedEntries = [];
+    for (let i = 0; i < sorted.length; i++) {
+      const current = sorted[i];
+      let rank = 1;
+      if (i > 0) {
+        const prev = sorted[i - 1];
+        if (
+          current.points === prev.points &&
+          current.wins === prev.wins &&
+          current.matchesPlayed === prev.matchesPlayed
+        ) {
+          rank = rankedEntries[i - 1].rank;
+        } else {
+          rank = i + 1;
+        }
+      }
+      rankedEntries.push({
+        rank,
+        playerId: current.playerId,
+        playerName: current.playerName,
+        matchesPlayed: current.matchesPlayed,
+        wins: current.wins,
+        draws: current.draws,
+        losses: current.losses,
+        points: current.points,
+      });
+    }
+
+    return {
+      tournamentId: tournament.id,
+      tournamentName: tournament.name,
+      entries: rankedEntries,
+    };
+  }
 }

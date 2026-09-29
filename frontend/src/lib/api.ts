@@ -127,11 +127,29 @@ export const api = {
     ),
 
   getParticipants: (id: string) => request<Participant[]>(`/tournaments/${id}/participants`),
+  getLeaderboard: (id: string) => request<TournamentLeaderboard>(`/tournaments/${id}/leaderboard`),
 
   // Matches
   getMatch: (id: string) => request<MatchDetails>(`/matches/${id}`),
   getMatchMoves: (id: string) => request<MatchMoveItem[]>(`/matches/${id}/moves`),
 };
+
+export interface LeaderboardEntry {
+  rank: number;
+  playerId: string;
+  playerName: string;
+  matchesPlayed: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  points: number;
+}
+
+export interface TournamentLeaderboard {
+  tournamentId: string;
+  tournamentName: string;
+  entries: LeaderboardEntry[];
+}
 
 export interface MatchMoveItem {
   id: string;

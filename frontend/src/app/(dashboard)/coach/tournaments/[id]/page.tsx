@@ -43,6 +43,15 @@ export default function CoachTournamentDetailsPage() {
     enabled: !!id,
   });
 
+  const {
+    data: leaderboard,
+    isLoading: isLeaderboardLoading,
+  } = useQuery({
+    queryKey: ['tournament-leaderboard', id],
+    queryFn: () => api.getLeaderboard(id),
+    enabled: !!id,
+  });
+
   const updateMutation = useMutation({
     mutationFn: (data: Parameters<typeof api.updateTournament>[1]) =>
       api.updateTournament(id, data),
@@ -333,6 +342,80 @@ export default function CoachTournamentDetailsPage() {
                 </div>
               </div>
             )}
+
+            {/* DYNAMIC LEADERBOARD / STANDINGS */}
+            <div className="rounded-3xl border border-brand-border bg-white p-6 sm:p-8 shadow-soft space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-brand-border pb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Trophy className="h-5 w-5 text-brand-orange" />
+                    <h2 className="text-xl font-extrabold text-brand-navy">Tournament Standings</h2>
+                  </div>
+                  <p className="text-xs text-brand-text-muted font-medium mt-0.5">
+                    Live leaderboard aggregated from completed matches
+                  </p>
+                </div>
+                <div className="text-[11px] font-bold text-brand-text-muted bg-brand-cream px-3 py-1 rounded-full border border-brand-border">
+                  Tiebreak: Points → Wins → Matches Played → Name
+                </div>
+              </div>
+
+              {!isLeaderboardLoading && leaderboard && (
+                <div>
+                  {leaderboard.entries.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-brand-border p-8 text-center text-xs text-brand-text-muted font-medium">
+                      No competitors currently enrolled to calculate standings.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="border-b border-brand-border text-brand-text-muted font-bold uppercase tracking-wider text-[11px]">
+                          <tr>
+                            <th className="py-3 px-4 w-16">Rank</th>
+                            <th className="py-3 px-4">Student</th>
+                            <th className="py-3 px-4 text-center">Played</th>
+                            <th className="py-3 px-4 text-center">Wins</th>
+                            <th className="py-3 px-4 text-center">Draws</th>
+                            <th className="py-3 px-4 text-center">Losses</th>
+                            <th className="py-3 px-4 text-right">Points</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-brand-border/60 font-medium">
+                          {leaderboard.entries.map((entry) => (
+                            <tr key={entry.playerId} className="hover:bg-brand-cream/50 transition-colors">
+                              <td className="py-3.5 px-4 font-extrabold text-sm">
+                                {entry.rank === 1 && entry.points > 0 ? (
+                                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 text-amber-800 border border-amber-300 font-extrabold text-xs">
+                                    <Crown className="h-3.5 w-3.5 text-amber-600 inline" />
+                                  </span>
+                                ) : (
+                                  <span className="text-brand-text-muted pl-1">#{entry.rank}</span>
+                                )}
+                              </td>
+                              <td className="py-3.5 px-4 font-bold text-brand-navy flex items-center gap-2">
+                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-teal-light text-brand-teal text-[10px]">
+                                  ♟
+                                </span>
+                                <span>{entry.playerName}</span>
+                              </td>
+                              <td className="py-3.5 px-4 text-center font-bold text-brand-navy">{entry.matchesPlayed}</td>
+                              <td className="py-3.5 px-4 text-center font-extrabold text-brand-teal">{entry.wins}</td>
+                              <td className="py-3.5 px-4 text-center font-bold text-brand-text-muted">{entry.draws}</td>
+                              <td className="py-3.5 px-4 text-center font-bold text-brand-text-muted">{entry.losses}</td>
+                              <td className="py-3.5 px-4 text-right">
+                                <span className="font-mono text-sm font-extrabold text-brand-orange bg-brand-orange-light px-2.5 py-1 rounded-lg border border-brand-orange/30">
+                                  {entry.points.toFixed(1)}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Participants Roster Table */}
             <div className="rounded-3xl border border-brand-border bg-white p-6 sm:p-8 shadow-soft space-y-6">
