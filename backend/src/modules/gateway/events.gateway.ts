@@ -39,7 +39,11 @@ function parseCookie(cookieString: string | undefined): Record<string, string> {
         'http://127.0.0.1:3000',
       ].filter(Boolean) as string[];
 
-      if (!requestOrigin || allowedOrigins.includes(requestOrigin)) {
+      const isVercelDomain = Boolean(
+        requestOrigin && /^https:\/\/.*\.vercel\.app$/.test(requestOrigin),
+      );
+
+      if (!requestOrigin || allowedOrigins.includes(requestOrigin) || isVercelDomain) {
         callback(null, true);
         return;
       }
