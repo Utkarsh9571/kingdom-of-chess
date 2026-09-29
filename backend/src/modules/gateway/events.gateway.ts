@@ -211,15 +211,19 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     const isCoach = user.role === 'COACH';
 
     if (!isWhite && !isBlack && !isCoach) {
+      if (typeof client.leave === 'function') {
+        await client.leave(`match:${data.matchId}`);
+      }
       client.emit('match:error', {
         code: 'FORBIDDEN',
-        message: 'Unauthorized: You are not a participant in this match room',
+        message: 'You are not authorized to join this match',
       });
       return;
     }
 
     // Securely join room
-    client.join(`match:${data.matchId}`);
+    await client.join(`match:${data.matchId}`);
+    console.log(`[Socket] User ${user.email} joined match:${data.matchId} as ${isWhite ? 'White' : isBlack ? 'Black' : 'Observer'}`);
 
     const color = isWhite ? 'w' : isBlack ? 'b' : 'observer';
 
@@ -291,10 +295,66 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       return;
     }
 
+    console.log(`[Socket] User ${user.email} proposed move in ${data.matchId}: ${data.from}->${data.to}`);
+
+    // Server-side identity verification: ensure user is an authorized player in this match
+    if (user.role === 'COACH') {
+      client.emit('match:error', {
+        code: 'FORBIDDEN',
+        message: 'Coaches/observers cannot make moves in matches',
+      });
+      return;
+    }
+
+    const [match] = await this.db
+      .select({
+        id: schema.matches.id,
+        whitePlayerId: schema.matches.whitePlayerId,
+        blackPlayerId: schema.matches.blackPlayerId,
+        status: schema.matches.status,
+        activeTurn: schema.matches.activeTurn,
+      })
+      .from(schema.matches)
+      .where(eq(schema.matches.id, data.matchId))
+      .limit(1);
+
+    if (!match) {
+      client.emit('match:error', { code: 'NOT_FOUND', message: 'Match not found' });
+      return;
+    }
+
+    const isWhite = match.whitePlayerId === user.sub;
+    const isBlack = match.blackPlayerId === user.sub;
+
+    if (!isWhite && !isBlack) {
+      client.emit('match:error', {
+        code: 'FORBIDDEN',
+        message: 'You are not a player in this match',
+      });
+      return;
+    }
+
+    if (match.status !== 'in_progress') {
+      client.emit('match:error', {
+        code: 'INVALID_MOVE',
+        message: 'Match is not in progress',
+      });
+      return;
+    }
+
+    if ((match.activeTurn === 'w' && !isWhite) || (match.activeTurn === 'b' && !isBlack)) {
+      client.emit('match:error', {
+        code: 'INVALID_MOVE',
+        message: 'Not your turn to move',
+      });
+      return;
+    }
+
     try {
       const state = await this.matchesService.makeMove(user.sub, user.role, data);
 
-      // Broadcast move event and updated state to the entire match room
+      // Broadcast move event and updated state strictly to the match room
+      console.log(`[Socket] Move valid! Broadcasting match:moved to match:${data.matchId}`);
       this.server.to(`match:${data.matchId}`).emit('match:moved', state);
       this.server.to(`match:${data.matchId}`).emit('match:state', state);
 
@@ -331,6 +391,41 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       return;
     }
 
+    if (user.role === 'COACH') {
+      client.emit('match:error', {
+        code: 'FORBIDDEN',
+        message: 'Coaches/observers cannot resign matches',
+      });
+      return;
+    }
+
+    const [match] = await this.db
+      .select({
+        id: schema.matches.id,
+        whitePlayerId: schema.matches.whitePlayerId,
+        blackPlayerId: schema.matches.blackPlayerId,
+        status: schema.matches.status,
+      })
+      .from(schema.matches)
+      .where(eq(schema.matches.id, data.matchId))
+      .limit(1);
+
+    if (!match) {
+      client.emit('match:error', { code: 'NOT_FOUND', message: 'Match not found' });
+      return;
+    }
+
+    const isWhite = match.whitePlayerId === user.sub;
+    const isBlack = match.blackPlayerId === user.sub;
+
+    if (!isWhite && !isBlack) {
+      client.emit('match:error', {
+        code: 'FORBIDDEN',
+        message: 'You are not a player in this match',
+      });
+      return;
+    }
+
     try {
       const state = await this.matchesService.resignMatch(user.sub, user.role, data.matchId);
 
@@ -349,6 +444,42 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
         code: 'RESIGN_ERROR',
         message: err.message,
       });
+    }
+  }
+
+  @SubscribeMessage('auth:refresh')
+  async handleAuthRefresh(client: Socket) {
+    try {
+      const parsedCookies = parseCookie(client.handshake.headers.cookie);
+      const token =
+        parsedCookies.jwt ||
+        client.handshake.auth?.token ||
+        (client.handshake.query?.token as string);
+
+      if (!token) {
+        client.emit('auth:error', { message: 'Authentication required' });
+        return;
+      }
+
+      const payload: JwtPayload = await this.authService.verifyToken(token);
+
+      if (client.data?.user?.sub && client.data.user.sub !== payload.sub) {
+        client.leave(`user:${client.data.user.sub}`);
+      }
+
+      client.data.user = payload;
+      client.join(`user:${payload.sub}`);
+
+      client.emit('auth:success', {
+        user: {
+          id: payload.sub,
+          email: payload.email,
+          role: payload.role,
+          name: payload.name,
+        },
+      });
+    } catch {
+      client.emit('auth:error', { message: 'Failed to refresh authentication' });
     }
   }
 }

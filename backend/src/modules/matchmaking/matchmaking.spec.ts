@@ -243,6 +243,7 @@ describe('Matchmaking & Concurrency Suite', () => {
         data: { user: { sub: student3.sub, role: 'STUDENT' } },
         emit: jest.fn(),
         join: jest.fn(),
+        leave: jest.fn(),
       };
 
       const mockMatch = {
@@ -307,6 +308,7 @@ describe('Matchmaking & Concurrency Suite', () => {
         data: { user: { sub: coachUser.sub, role: 'COACH' } },
         emit: jest.fn(),
         join: jest.fn(),
+        leave: jest.fn(),
       };
 
       const mockMatch = {
@@ -331,6 +333,148 @@ describe('Matchmaking & Concurrency Suite', () => {
       expect(mockClient.emit).toHaveBeenCalledWith(
         'match:joined',
         expect.objectContaining({ matchId: 'match-100', color: 'observer' }),
+      );
+    });
+  });
+
+  describe('9. Security & Multi-Player Regression Suite (Phases 1-9)', () => {
+    it('Three students queue: exactly two are paired, third stays queued with matchId: null and receives no match notification', async () => {
+      const notifications: MatchMatchedNotification[] = [];
+      service.onMatchNotification((notif) => {
+        notifications.push(notif);
+      });
+
+      const res1 = await service.joinQueue(student1, tournamentId);
+      const res2 = await service.joinQueue(student2, tournamentId);
+      const res3 = await service.joinQueue(student3, tournamentId);
+
+      // Student 1 and 2 are paired
+      expect(res1.inQueue).toBe(true);
+      expect(res2.matchId).toBeTruthy();
+
+      // Student 3 MUST NOT receive matchId
+      expect(res3.matchId).toBeNull();
+      expect(res3.inQueue).toBe(true);
+      expect(res3.queueSize).toBe(1);
+
+      // Notifications were sent only for the first match, with white and black being student 1 and 2
+      expect(notifications.length).toBe(1);
+      const pairedIds = [notifications[0].whitePlayerId, notifications[0].blackPlayerId];
+      expect(pairedIds).toContain(student1.sub);
+      expect(pairedIds).toContain(student2.sub);
+      expect(pairedIds).not.toContain(student3.sub);
+    });
+
+    it('Unauthorized student cannot join match room, receive state, or join events', async () => {
+      const mockClient: any = {
+        data: { user: { sub: student3.sub, role: 'STUDENT' } },
+        emit: jest.fn(),
+        join: jest.fn(),
+        leave: jest.fn(),
+      };
+
+      const mockMatch = {
+        id: 'match-private-999',
+        whitePlayerId: student1.sub,
+        blackPlayerId: student2.sub,
+        status: 'in_progress',
+        currentFen: 'start-fen',
+      };
+
+      mockDb.select = jest.fn(() => ({
+        from: jest.fn(() => ({
+          where: jest.fn(() => ({
+            limit: jest.fn(() => [mockMatch]),
+          })),
+        })),
+      }));
+
+      await gateway.handleMatchJoin(mockClient, { matchId: 'match-private-999' });
+
+      // Must be rejected with FORBIDDEN
+      expect(mockClient.emit).toHaveBeenCalledWith(
+        'match:error',
+        expect.objectContaining({
+          code: 'FORBIDDEN',
+          message: 'You are not authorized to join this match',
+        }),
+      );
+      expect(mockClient.join).not.toHaveBeenCalled();
+      expect(mockClient.emit).not.toHaveBeenCalledWith('match:joined', expect.anything());
+      expect(mockClient.emit).not.toHaveBeenCalledWith('match:state', expect.anything());
+    });
+
+    it('Unauthorized student cannot submit a move for another match', async () => {
+      const mockClient: any = {
+        data: { user: { sub: student3.sub, role: 'STUDENT' } },
+        emit: jest.fn(),
+        join: jest.fn(),
+        leave: jest.fn(),
+      };
+
+      const mockMatch = {
+        id: 'match-private-999',
+        whitePlayerId: student1.sub,
+        blackPlayerId: student2.sub,
+        status: 'in_progress',
+      };
+
+      mockDb.select = jest.fn(() => ({
+        from: jest.fn(() => ({
+          where: jest.fn(() => ({
+            limit: jest.fn(() => [mockMatch]),
+          })),
+        })),
+      }));
+
+      await gateway.handleMatchMove(mockClient, {
+        matchId: 'match-private-999',
+        from: 'e2',
+        to: 'e4',
+      });
+
+      expect(mockClient.emit).toHaveBeenCalledWith(
+        'match:error',
+        expect.objectContaining({
+          code: 'FORBIDDEN',
+          message: expect.stringMatching(/not (a player|authorized)/i),
+        }),
+      );
+    });
+
+    it('Unauthorized student cannot resign another match', async () => {
+      const mockClient: any = {
+        data: { user: { sub: student3.sub, role: 'STUDENT' } },
+        emit: jest.fn(),
+        join: jest.fn(),
+        leave: jest.fn(),
+      };
+
+      const mockMatch = {
+        id: 'match-private-999',
+        whitePlayerId: student1.sub,
+        blackPlayerId: student2.sub,
+        status: 'in_progress',
+      };
+
+      mockDb.select = jest.fn(() => ({
+        from: jest.fn(() => ({
+          where: jest.fn(() => ({
+            limit: jest.fn(() => [mockMatch]),
+          })),
+        })),
+      }));
+
+      await gateway.handleMatchResign(mockClient, {
+        matchId: 'match-private-999',
+      });
+
+      expect(mockClient.emit).toHaveBeenCalledWith(
+        'match:error',
+        expect.objectContaining({
+          code: 'FORBIDDEN',
+          message: expect.stringMatching(/not (a player|authorized)/i),
+        }),
       );
     });
   });

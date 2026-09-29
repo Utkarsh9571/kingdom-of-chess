@@ -4,13 +4,15 @@ import React from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Crown, LogOut, ArrowRight, Trophy, Swords, User } from 'lucide-react';
 import { api } from '@/lib/api';
+import { useSocket } from '@/context/SocketContext';
+import { Crown, Trophy, Swords, User, LogOut, ArrowRight } from 'lucide-react';
 
 export function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const queryClient = useQueryClient();
+  const { reconnectSocket } = useSocket();
 
   const { data: user } = useQuery({
     queryKey: ['me'],
@@ -22,6 +24,7 @@ export function Navbar() {
     mutationFn: api.logout,
     onSuccess: () => {
       queryClient.clear();
+      reconnectSocket();
       router.push('/login');
     },
   });

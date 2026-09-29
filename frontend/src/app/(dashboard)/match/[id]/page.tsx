@@ -92,7 +92,7 @@ export default function MatchArenaPage() {
   const [matchState, setMatchState] = useState<Partial<MatchDetails> | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
-  const [userColor, setUserColor] = useState<'white' | 'black' | 'observer' | 'coach'>('white');
+  const [userColor, setUserColor] = useState<'white' | 'black' | 'observer' | 'coach'>('observer');
   const [showResignModal, setShowResignModal] = useState(false);
   const [isResigning, setIsResigning] = useState(false);
 
@@ -266,6 +266,15 @@ export default function MatchArenaPage() {
     };
   }, [socket, isConnected, id]);
 
+  const isUnauthorized = Boolean(joinError || (isError && !isLoading));
+
+  // Automatically depart match room if authorization fails
+  useEffect(() => {
+    if (isUnauthorized && socket && id) {
+      socket.emit('match:leave', { matchId: id });
+    }
+  }, [isUnauthorized, socket, id]);
+
   const boardOrientation = userColor === 'black' ? 'black' : 'white';
 
   // Compute authoritative, drift-free clocks
@@ -307,7 +316,7 @@ export default function MatchArenaPage() {
     // Prevent duplicate moves while awaiting server confirmation
     if (isPendingMove) return false;
 
-    if (activeMatch?.status !== 'in_progress') {
+    if (isUnauthorized || activeMatch?.status !== 'in_progress') {
       setMoveError('Move rejected');
       setTimeout(() => setMoveError(null), 2500);
       return false;
@@ -388,7 +397,9 @@ export default function MatchArenaPage() {
 
   // Click-to-Move Handler
   const onSquareClick = (square: string) => {
-    if (activeMatch?.status !== 'in_progress' || isPendingMove) return;
+    if (isUnauthorized || activeMatch?.status !== 'in_progress' || isPendingMove) return;
+
+    if (userColor !== 'white' && userColor !== 'black') return;
 
     if (!isMyTurn) {
       setMoveError('Move rejected');
@@ -450,7 +461,7 @@ export default function MatchArenaPage() {
 
   // Drag-and-drop piece filter
   const isDraggablePiece = ({ piece }: { piece: string }) => {
-    if (activeMatch?.status !== 'in_progress' || isPendingMove) return false;
+    if (isUnauthorized || activeMatch?.status !== 'in_progress' || isPendingMove) return false;
     if (userColor === 'white' && piece.startsWith('w')) return true;
     if (userColor === 'black' && piece.startsWith('b')) return true;
     return false;
@@ -625,27 +636,35 @@ export default function MatchArenaPage() {
           </div>
         </div>
 
-        {/* Informative Alerts & Move Feedback */}
-        {joinError && (
-          <div className="rounded-2xl border border-destructive/30 bg-brand-pink-light p-4 text-xs font-bold text-destructive flex items-center gap-3">
-            <AlertCircle className="h-5 w-5 shrink-0" />
-            <div>
-              <div className="font-extrabold">Access Denied</div>
-              <div>{joinError}</div>
+        {/* Unauthorized / Access Denied Banner */}
+        {isUnauthorized && (
+          <div className="rounded-3xl border-2 border-destructive/30 bg-white p-8 max-w-xl mx-auto text-center space-y-5 shadow-soft-lg mt-8">
+            <div className="h-16 w-16 mx-auto rounded-3xl bg-brand-pink-light border border-destructive/20 flex items-center justify-center text-destructive">
+              <AlertCircle className="h-8 w-8" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-black text-brand-navy">Access Denied</h2>
+              <p className="text-sm font-semibold text-brand-text-muted">
+                {joinError || (error as Error)?.message || 'You are not authorized to view or participate in this match.'}
+              </p>
+            </div>
+            <div className="pt-2">
+              <Link
+                href="/student/tournaments"
+                className="inline-flex items-center gap-2 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-white font-extrabold text-xs px-6 py-3 shadow-soft transition-all"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Return to Tournaments
+              </Link>
             </div>
           </div>
         )}
 
+        {/* Informative Move Feedback */}
         {moveError && (
           <div className="rounded-2xl border border-destructive/30 bg-brand-pink-light p-3.5 text-xs font-bold text-destructive flex items-center gap-2.5 shadow-soft">
             <XCircle className="h-4 w-4 shrink-0 text-destructive" />
             <span>{moveError}</span>
-          </div>
-        )}
-
-        {isError && !joinError && (
-          <div className="rounded-2xl border border-destructive/30 bg-brand-pink-light p-4 text-xs font-bold text-destructive">
-            Failed to load match: {(error as Error)?.message}
           </div>
         )}
 
@@ -690,7 +709,7 @@ export default function MatchArenaPage() {
         )}
 
         {/* Arena Body */}
-        {!isLoading && activeMatch && (
+        {!isLoading && !isUnauthorized && activeMatch && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             {/* LEFT / PRIMARY AREA: Chessboard Column */}
             <div className="lg:col-span-8 flex flex-col items-center space-y-4">

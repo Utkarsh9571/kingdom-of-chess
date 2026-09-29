@@ -178,11 +178,16 @@ export class MatchmakingService {
         pairedMatch = await this.pairPlayers(tournament, queue);
       }
 
+      const isUserPaired = Boolean(
+        pairedMatch &&
+        (pairedMatch.whitePlayerId === user.sub || pairedMatch.blackPlayerId === user.sub),
+      );
+
       return {
-        inQueue: !pairedMatch || !queue.some((p) => p.userId === user.sub),
+        inQueue: !isUserPaired && queue.some((p) => p.userId === user.sub),
         tournamentId,
         queueSize: queue.length,
-        matchId: pairedMatch?.id || null,
+        matchId: isUserPaired ? pairedMatch!.id : null,
       };
     });
   }

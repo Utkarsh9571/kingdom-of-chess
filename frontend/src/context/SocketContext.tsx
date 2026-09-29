@@ -1,8 +1,9 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
+import { api } from '@/lib/api';
 
 export interface MatchedEvent {
   matchId: string;
@@ -24,6 +25,7 @@ interface SocketContextType {
   activeMatch: MatchedEvent | null;
   joinMatchmaking: (tournamentId: string) => void;
   leaveMatchmaking: (tournamentId: string) => void;
+  reconnectSocket: () => void;
   isQueueing: boolean;
   queuedTournamentId: string | null;
   queueError: string | null;
@@ -36,6 +38,7 @@ const SocketContext = createContext<SocketContextType>({
   activeMatch: null,
   joinMatchmaking: () => {},
   leaveMatchmaking: () => {},
+  reconnectSocket: () => {},
   isQueueing: false,
   queuedTournamentId: null,
   queueError: null,
@@ -52,6 +55,11 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
   const [isQueueing, setIsQueueing] = useState(false);
   const [queuedTournamentId, setQueuedTournamentId] = useState<string | null>(null);
   const [queueError, setQueueError] = useState<string | null>(null);
+  const [connectionKey, setConnectionKey] = useState(0);
+
+  const reconnectSocket = useCallback(() => {
+    setConnectionKey((prev) => prev + 1);
+  }, []);
 
   useEffect(() => {
     const newSocket = io(SOCKET_URL, {
@@ -63,6 +71,8 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     newSocket.on('connect', () => {
       console.log('[Socket] Connected to server, ID:', newSocket.id);
       setIsConnected(true);
+      // Immediately refresh authentication with latest session credentials
+      newSocket.emit('auth:refresh');
     });
 
     newSocket.on('disconnect', () => {
@@ -79,13 +89,23 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     });
 
     // Listen for automatic matchmaking pairing
-    newSocket.on('queue:matched', (data: MatchedEvent) => {
+    newSocket.on('queue:matched', async (data: MatchedEvent) => {
       console.log('[Socket] Opponent matched! Match ID:', data.matchId);
+
+      // Defense-in-depth: Verify authenticated user is actually a participant
+      try {
+        const me = await api.getMe();
+        if (me && data.opponent?.id === me.id) {
+          console.warn('[Socket] Ignored queue:matched where opponent ID matches self');
+          return;
+        }
+      } catch {}
+
       setIsQueueing(false);
       setQueuedTournamentId(null);
       setActiveMatch(data);
 
-      // Seamless auto-transition to the live match arena without browser refresh
+      // Transition to match arena
       router.push(`/match/${data.matchId}`);
     });
 
@@ -110,7 +130,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     return () => {
       newSocket.disconnect();
     };
-  }, [router]);
+  }, [connectionKey, router]);
 
   const joinMatchmaking = (tournamentId: string) => {
     if (!socket || !isConnected) {
@@ -140,6 +160,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
         activeMatch,
         joinMatchmaking,
         leaveMatchmaking,
+        reconnectSocket,
         isQueueing,
         queuedTournamentId,
         queueError,

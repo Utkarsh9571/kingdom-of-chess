@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Crown, User, ArrowRight, AlertCircle, Sparkles } from 'lucide-react';
 import { api } from '@/lib/api';
+import { useSocket } from '@/context/SocketContext';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,10 +16,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState('Password123!');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const { reconnectSocket } = useSocket();
+
   const loginMutation = useMutation({
     mutationFn: api.login,
     onSuccess: (data) => {
       queryClient.setQueryData(['me'], data.user);
+      reconnectSocket();
       if (data.user.role === 'COACH') {
         router.push('/coach/tournaments');
       } else {
