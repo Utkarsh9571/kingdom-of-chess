@@ -87,7 +87,6 @@ export class AuthService {
         name: user.name,
         role: user.role,
       },
-      token, // Also returned in data envelope for flexible client use if needed
     };
   }
 

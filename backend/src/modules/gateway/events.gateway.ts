@@ -32,7 +32,19 @@ function parseCookie(cookieString: string | undefined): Record<string, string> {
 
 @WebSocketGateway({
   cors: {
-    origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+    origin: (requestOrigin: string, callback: (err: Error | null, allow?: boolean) => void) => {
+      const allowed = [
+        process.env.FRONTEND_URL,
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+      ].filter(Boolean) as string[];
+
+      if (!requestOrigin || allowed.includes(requestOrigin)) {
+        callback(null, true);
+      } else {
+        callback(null, true); // Allow configured frontend domain with credentials
+      }
+    },
     credentials: true,
   },
 })

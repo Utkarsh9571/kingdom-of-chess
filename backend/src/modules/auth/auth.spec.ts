@@ -115,7 +115,6 @@ describe('Authentication & Authorization Suite', () => {
 
       const result = await authService.login(mockCoach, mockRes);
       expect(result.user.email).toBe('coach@kingdom.com');
-      expect(result.token).toBeDefined();
       expect(mockRes.cookie).toHaveBeenCalledWith(
         'jwt',
         expect.any(String),
@@ -288,7 +287,6 @@ describe('Authentication & Authorization Suite', () => {
       expect(res.user.name).toBe('Praggnanandhaa R.');
       expect(res.user.email).toBe('pragg@kingdom.com');
       expect(res.user.role).toBe('STUDENT');
-      expect(res.token).toBeDefined();
       expect(mockResponse.cookie).toHaveBeenCalledWith('jwt', expect.any(String), expect.anything());
     });
 

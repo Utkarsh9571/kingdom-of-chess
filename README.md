@@ -180,8 +180,6 @@ The seed script creates the following pre-configured accounts:
 | **STUDENT** | Gukesh D. | `student3@kingdom.com` | `Password123!` | Enrolled tournament player |
 | **STUDENT** | Vaishali R. | `student4@kingdom.com` | `Password123!` | Enrolled tournament player |
 
-> **Convenience Feature**: The `/login` page includes **one-click quick-fill buttons** for each of these test users to enable rapid switching during evaluation.
-
 ---
 
 ## Two-Browser Match Testing Walkthrough
@@ -190,11 +188,11 @@ Follow this step-by-step walkthrough to test the live match loop across two brow
 
 ### Step 1: Open Sessions
 1. **Window 1 (Normal)**: Navigate to `http://localhost:3000/login`.
-   - Click the quick-fill button for **"♟ Priyal M."** (`student1@kingdom.com`).
+   - Enter email: `student1@kingdom.com` and password: `Password123!`.
    - Click **"Sign In"**. You will be taken to the Student Tournaments page.
    - Click **"Tournament Hub"** on the tournament *"Kingdom Autumn Rapid 2026"*.
 2. **Window 2 (Incognito / Private)**: Navigate to `http://localhost:3000/login`.
-   - Click the quick-fill button for **"♟ Utkarsh S."** (`student2@kingdom.com`).
+   - Enter email: `student2@kingdom.com` and password: `Password123!`.
    - Click **"Sign In"** and open the same tournament hub.
 
 ### Step 2: Queue & Auto-Pairing
@@ -330,18 +328,18 @@ Run the test suite:
 npm run test --workspace=backend
 ```
 
-### Verified Test Results (66 / 66 Tests Passing)
+### Verified Test Results (73 / 73 Tests Passing)
 ```
-PASS src/modules/auth/auth.spec.ts (12 tests)
+PASS src/modules/auth/auth.spec.ts (19 tests)
 PASS src/modules/tournaments/tournaments.spec.ts (9 tests)
 PASS src/modules/matchmaking/matchmaking.spec.ts (15 tests)
 PASS src/modules/matches/matches.spec.ts (17 tests)
 PASS src/modules/tournaments/leaderboard.spec.ts (13 tests)
 
 Test Suites: 5 passed, 5 total
-Tests:       66 passed, 66 total
+Tests:       73 passed, 73 total
 Snapshots:   0 total
-Time:        18.024 s
+Time:        14.804 s
 ```
 
 ### Build Verification
