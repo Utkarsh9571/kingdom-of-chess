@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { MatchmakingService, MatchMatchedNotification } from './matchmaking.service';
 import { EventsGateway } from '../gateway/events.gateway';
+import { MatchesService } from '../matches/matches.service';
 import { AuthService } from '../auth/auth.service';
 import { DRIZZLE } from '../../database/database.module';
 import * as schema from '../../database/schema';
@@ -101,6 +102,15 @@ describe('Matchmaking & Concurrency Suite', () => {
         {
           provide: AuthService,
           useValue: { verifyToken: jest.fn() },
+        },
+        {
+          provide: MatchesService,
+          useValue: {
+            onMatchEnded: jest.fn(),
+            ensureMatchTimer: jest.fn(),
+            makeMove: jest.fn(),
+            resignMatch: jest.fn(),
+          },
         },
         {
           provide: DRIZZLE,

@@ -130,7 +130,22 @@ export const api = {
 
   // Matches
   getMatch: (id: string) => request<MatchDetails>(`/matches/${id}`),
+  getMatchMoves: (id: string) => request<MatchMoveItem[]>(`/matches/${id}/moves`),
 };
+
+export interface MatchMoveItem {
+  id: string;
+  matchId: string;
+  ply: number;
+  moveNotation: string;
+  fromSquare: string;
+  toSquare: string;
+  promotion: string | null;
+  fenAfter: string;
+  whiteTimeMs: number;
+  blackTimeMs: number;
+  createdAt: string;
+}
 
 export interface MatchDetails {
   id: string;
@@ -141,7 +156,7 @@ export interface MatchDetails {
   incrementSeconds: number;
   status: 'in_progress' | 'completed' | 'abandoned';
   result?: 'white_win' | 'black_win' | 'draw' | null;
-  reason?: string | null;
+  reason?: 'checkmate' | 'resignation' | 'timeout' | 'stalemate' | string | null;
   winnerId?: string | null;
   currentFen: string;
   pgn: string;
@@ -150,7 +165,10 @@ export interface MatchDetails {
   whiteTimeRemainingMs: number;
   blackTimeRemainingMs: number;
   activeTurn: 'w' | 'b';
+  lastTurnStartTime?: string | null;
   userRole: 'white' | 'black' | 'coach';
   createdAt: string;
+  endedAt?: string | null;
 }
+
 

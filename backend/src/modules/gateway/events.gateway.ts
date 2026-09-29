@@ -6,11 +6,12 @@ import {
   OnGatewayDisconnect,
   SubscribeMessage,
 } from '@nestjs/websockets';
-import { Inject, forwardRef } from '@nestjs/common';
+import { Inject } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { eq } from 'drizzle-orm';
 import { AuthService } from '../auth/auth.service';
 import { MatchmakingService } from '../matchmaking/matchmaking.service';
+import { MatchesService } from '../matches/matches.service';
 import { JwtPayload } from '../../common/guards/jwt-auth.guard';
 import { DRIZZLE, DrizzleDb } from '../../database/database.module';
 import * as schema from '../../database/schema';
@@ -42,10 +43,12 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
   constructor(
     private readonly authService: AuthService,
     private readonly matchmakingService: MatchmakingService,
+    private readonly matchesService: MatchesService,
     @Inject(DRIZZLE) private readonly db: DrizzleDb,
   ) {}
 
   afterInit(server: Server) {
+    // 1. Listen for matchmaking pairings and notify players in their private user rooms
     this.matchmakingService.onMatchNotification((notification) => {
       console.log(
         `[Socket] Emitting queue:matched to White (${notification.whitePlayerId}) and Black (${notification.blackPlayerId}) for match ${notification.matchId}`,
@@ -56,6 +59,21 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       this.server
         .to(`user:${notification.blackPlayerId}`)
         .emit('queue:matched', notification.blackPayload);
+    });
+
+    // 2. Listen for matches ended by timeout or internal triggers
+    this.matchesService.onMatchEnded((state) => {
+      console.log(
+        `[Socket] Match ${state.matchId} ended with result: ${state.result} (${state.reason})`,
+      );
+      this.server.to(`match:${state.matchId}`).emit('match:state', state);
+      this.server.to(`match:${state.matchId}`).emit('match:ended', {
+        matchId: state.matchId,
+        result: state.result,
+        winnerId: state.winnerId,
+        reason: state.reason,
+        pgn: state.pgn,
+      });
     });
   }
 
@@ -223,23 +241,114 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       .where(eq(schema.users.id, match.blackPlayerId))
       .limit(1);
 
+    // Ensure timer is ticking if match is in progress
+    if (match.status === 'in_progress') {
+      this.matchesService.ensureMatchTimer(match);
+    }
+
     const payload = {
       matchId: match.id,
       tournamentId: match.tournamentId,
       tournamentName: tournament?.name || 'Tournament',
       timeControl: tournament?.timeControl || '5+0',
+      initialTimeSeconds: tournament?.initialTimeSeconds || 300,
+      incrementSeconds: tournament?.incrementSeconds || 0,
       color,
       fen: match.currentFen,
       pgn: match.pgn,
       status: match.status,
+      result: match.result,
+      reason: match.reason,
+      winnerId: match.winnerId,
       whitePlayer: whiteUser,
       blackPlayer: blackUser,
       whiteTimeRemainingMs: match.whiteTimeRemainingMs,
       blackTimeRemainingMs: match.blackTimeRemainingMs,
       activeTurn: match.activeTurn,
+      lastTurnStartTime: match.lastTurnStartTime,
     };
 
     client.emit('match:joined', payload);
     client.emit('match:state', payload);
+  }
+
+  @SubscribeMessage('match:move')
+  async handleMatchMove(
+    client: Socket,
+    data: { matchId: string; from: string; to: string; promotion?: string },
+  ) {
+    const user = client.data?.user;
+    if (!user) {
+      client.emit('match:error', { code: 'UNAUTHORIZED', message: 'Authentication required' });
+      return;
+    }
+
+    if (!data?.matchId || !data?.from || !data?.to) {
+      client.emit('match:error', {
+        code: 'BAD_REQUEST',
+        message: 'matchId, from, and to are required for a move',
+      });
+      return;
+    }
+
+    try {
+      const state = await this.matchesService.makeMove(user.sub, user.role, data);
+
+      // Broadcast move event and updated state to the entire match room
+      this.server.to(`match:${data.matchId}`).emit('match:moved', state);
+      this.server.to(`match:${data.matchId}`).emit('match:state', state);
+
+      // If move completed the game (checkmate/stalemate/draw), emit match:ended
+      if (state.status === 'completed') {
+        this.server.to(`match:${data.matchId}`).emit('match:ended', {
+          matchId: state.matchId,
+          result: state.result,
+          winnerId: state.winnerId,
+          reason: state.reason,
+          pgn: state.pgn,
+        });
+      }
+
+      return { event: 'match:move_ack', data: state };
+    } catch (err: any) {
+      client.emit('match:error', {
+        code: err.status === 400 ? 'INVALID_MOVE' : 'MOVE_ERROR',
+        message: err.message,
+      });
+    }
+  }
+
+  @SubscribeMessage('match:resign')
+  async handleMatchResign(client: Socket, data: { matchId: string }) {
+    const user = client.data?.user;
+    if (!user) {
+      client.emit('match:error', { code: 'UNAUTHORIZED', message: 'Authentication required' });
+      return;
+    }
+
+    if (!data?.matchId) {
+      client.emit('match:error', { code: 'BAD_REQUEST', message: 'matchId is required' });
+      return;
+    }
+
+    try {
+      const state = await this.matchesService.resignMatch(user.sub, user.role, data.matchId);
+
+      this.server.to(`match:${data.matchId}`).emit('match:state', state);
+      this.server.to(`match:${data.matchId}`).emit('match:ended', {
+        matchId: state.matchId,
+        result: state.result,
+        winnerId: state.winnerId,
+        reason: state.reason,
+        pgn: state.pgn,
+      });
+
+      return { event: 'match:resign_ack', data: state };
+    } catch (err: any) {
+      client.emit('match:error', {
+        code: 'RESIGN_ERROR',
+        message: err.message,
+      });
+    }
   }
 }
