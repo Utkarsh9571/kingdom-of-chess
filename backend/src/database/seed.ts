@@ -30,13 +30,13 @@ export async function runSeed() {
     {
       email: 'student1@kingdom.com',
       passwordHash,
-      name: 'Utkarsh S.',
+      name: 'Priyal M.',
       role: 'STUDENT' as const,
     },
     {
       email: 'student2@kingdom.com',
       passwordHash,
-      name: 'Priyal M.',
+      name: 'Utkarsh S.',
       role: 'STUDENT' as const,
     },
     {

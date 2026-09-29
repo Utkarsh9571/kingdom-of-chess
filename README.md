@@ -175,8 +175,8 @@ The seed script creates the following pre-configured accounts:
 | Role | Name | Email | Password | Description |
 | :--- | :--- | :--- | :--- | :--- |
 | **COACH** | Coach Garry | `coach@kingdom.com` | `Password123!` | Tournament administrator & organizer |
-| **STUDENT** | Utkarsh S. | `student1@kingdom.com` | `Password123!` | Enrolled tournament player |
-| **STUDENT** | Priyal M. | `student2@kingdom.com` | `Password123!` | Enrolled tournament player |
+| **STUDENT** | Priyal M. | `student1@kingdom.com` | `Password123!` | Enrolled tournament player |
+| **STUDENT** | Utkarsh S. | `student2@kingdom.com` | `Password123!` | Enrolled tournament player |
 | **STUDENT** | Gukesh D. | `student3@kingdom.com` | `Password123!` | Enrolled tournament player |
 | **STUDENT** | Vaishali R. | `student4@kingdom.com` | `Password123!` | Enrolled tournament player |
 
@@ -190,17 +190,17 @@ Follow this step-by-step walkthrough to test the live match loop across two brow
 
 ### Step 1: Open Sessions
 1. **Window 1 (Normal)**: Navigate to `http://localhost:3000/login`.
-   - Click the quick-fill button for **"♟ Utkarsh S."** (`student1@kingdom.com`).
+   - Click the quick-fill button for **"♟ Priyal M."** (`student1@kingdom.com`).
    - Click **"Sign In"**. You will be taken to the Student Tournaments page.
    - Click **"Tournament Hub"** on the tournament *"Kingdom Autumn Rapid 2026"*.
 2. **Window 2 (Incognito / Private)**: Navigate to `http://localhost:3000/login`.
-   - Click the quick-fill button for **"♟ Priyal M."** (`student2@kingdom.com`).
+   - Click the quick-fill button for **"♟ Utkarsh S."** (`student2@kingdom.com`).
    - Click **"Sign In"** and open the same tournament hub.
 
 ### Step 2: Queue & Auto-Pairing
 1. In **Window 1**, click **"⚔️ Find Opponent"**. You will see the queue banner: *"Searching for an opponent..."*.
 2. In **Window 2**, click **"⚔️ Find Opponent"**.
-3. **Instant Pairing**: The server atomically pairs Utkarsh S. and Priyal M., assigns White and Black sides, and transitions **both windows automatically** to `/match/{matchId}` without manual refresh.
+3. **Instant Pairing**: The server atomically pairs Priyal M. and Utkarsh S., assigns White and Black sides, and transitions **both windows automatically** to `/match/{matchId}` without manual refresh.
 
 ### Step 3: Play Moves on Synchronized Board
 1. The player assigned **White** sees their pieces at the bottom with the badge *"Your Turn!"*.
