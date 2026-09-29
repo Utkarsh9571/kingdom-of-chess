@@ -26,7 +26,15 @@ export class JwtAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     const token = this.extractTokenFromRequest(request);
 
+    const hasCookieObj = Boolean(request.cookies);
+    const cookieNames = request.cookies ? Object.keys(request.cookies) : [];
+    const hasJwtCookie = Boolean(request.cookies && request.cookies.jwt);
+    const hasToken = Boolean(token);
+
     if (!token) {
+      console.warn(
+        `[AuthGuard Diagnostic] Token missing. Path: ${request.path}, HasCookieObj: ${hasCookieObj}, CookieNames: [${cookieNames.join(', ')}], HasJwtCookie: ${hasJwtCookie}`,
+      );
       throw new UnauthorizedException('Authentication token missing or invalid');
     }
 
@@ -42,7 +50,10 @@ export class JwtAuthGuard implements CanActivate {
       // Attach user to request
       request.user = payload;
       return true;
-    } catch {
+    } catch (err: any) {
+      console.warn(
+        `[AuthGuard Diagnostic] Token verification failed. Path: ${request.path}, Reason: ${err?.message || err}`,
+      );
       throw new UnauthorizedException('Invalid or expired authentication token');
     }
   }
