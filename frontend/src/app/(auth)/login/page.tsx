@@ -102,7 +102,7 @@ export default function LoginPage() {
                 }`}
               >
                 <User className="h-3.5 w-3.5 text-brand-teal shrink-0" />
-                <span className="truncate">Anand Jr.</span>
+                <span className="truncate">Utkarsh S.</span>
               </button>
 
               <button
@@ -115,7 +115,7 @@ export default function LoginPage() {
                 }`}
               >
                 <User className="h-3.5 w-3.5 text-brand-teal shrink-0" />
-                <span className="truncate">Pragg R.</span>
+                <span className="truncate">Priyal M.</span>
               </button>
 
               <button
