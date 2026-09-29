@@ -13,26 +13,26 @@ async function loginUser(email, password) {
     throw new Error(`Login failed for ${email}: ${await res.text()}`);
   }
   const setCookie = res.headers.get('set-cookie');
-  let token = null;
+  let cookieHeader = null;
   if (setCookie) {
     const match = setCookie.match(/jwt=([^;]+)/);
-    if (match) token = match[1];
+    if (match) cookieHeader = `jwt=${match[1]}`;
   }
   const data = await res.json();
-  return { user: data.data.user, token };
+  return { user: data.data.user, cookieHeader };
 }
 
-async function getTournaments(token) {
+async function getTournaments(cookieHeader) {
   const res = await fetch(`${BASE_URL}/tournaments`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Cookie: cookieHeader },
   });
   const data = await res.json();
   return data.data;
 }
 
-async function getLeaderboard(tournamentId, token) {
+async function getLeaderboard(tournamentId, cookieHeader) {
   const res = await fetch(`${BASE_URL}/tournaments/${tournamentId}/leaderboard`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Cookie: cookieHeader },
   });
   if (!res.ok) {
     throw new Error(`Leaderboard request failed (${res.status}): ${await res.text()}`);
@@ -59,13 +59,13 @@ async function run() {
   console.log(`✓ Student 4: ${student4.user.name}`);
 
   console.log('\n=== STEP 2: Fetching Seeded Tournament ===');
-  const tournaments = await getTournaments(student1.token);
+  const tournaments = await getTournaments(student1.cookieHeader);
   const tournament = tournaments.find((t) => t.status === 'open' || t.status === 'ongoing');
   if (!tournament) throw new Error('No open/ongoing tournament found');
   console.log(`✓ Tournament: "${tournament.name}" (${tournament.id})`);
 
   console.log('\n=== STEP 3: Checking Current Real-Time Leaderboard ===');
-  const lbInitial = await getLeaderboard(tournament.id, student1.token);
+  const lbInitial = await getLeaderboard(tournament.id, student1.cookieHeader);
   console.log(`✓ Leaderboard retrieved for "${lbInitial.tournamentName}":`);
   console.table(
     lbInitial.entries.map((e) => ({
@@ -85,8 +85,8 @@ async function run() {
   }
 
   console.log('\n=== STEP 4: Simulating Quick Game Between Student 3 & Student 4 ===');
-  const socket3 = io(SOCKET_URL, { auth: { token: student3.token }, transports: ['websocket'] });
-  const socket4 = io(SOCKET_URL, { auth: { token: student4.token }, transports: ['websocket'] });
+  const socket3 = io(SOCKET_URL, { extraHeaders: { Cookie: student3.cookieHeader }, transports: ['websocket'] });
+  const socket4 = io(SOCKET_URL, { extraHeaders: { Cookie: student4.cookieHeader }, transports: ['websocket'] });
 
   await Promise.all([
     new Promise((resolve) => socket3.on('connect', resolve)),
@@ -141,7 +141,7 @@ async function run() {
   socket4.disconnect();
 
   console.log('\n=== STEP 5: Verifying Updated Leaderboard Post-Match ===');
-  const lbUpdated = await getLeaderboard(tournament.id, student1.token);
+  const lbUpdated = await getLeaderboard(tournament.id, student1.cookieHeader);
   console.log(`✓ Leaderboard immediately updated with new result:`);
   console.table(
     lbUpdated.entries.map((e) => ({
@@ -167,7 +167,7 @@ async function run() {
   }
 
   console.log('\n=== STEP 6: Testing Coach Authorization ===');
-  const coachLb = await getLeaderboard(tournament.id, coach.token);
+  const coachLb = await getLeaderboard(tournament.id, coach.cookieHeader);
   console.log(`✓ Coach successfully accessed leaderboard with ${coachLb.entries.length} entries`);
 
   console.log('\n=== STEP 7: Testing Unauthorized Student Rejection ===');

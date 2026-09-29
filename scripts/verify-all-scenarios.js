@@ -9,15 +9,21 @@ async function login(email, password) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   });
+  const setCookie = res.headers.get('set-cookie');
+  let cookieHeader = null;
+  if (setCookie) {
+    const match = setCookie.match(/jwt=([^;]+)/);
+    if (match) cookieHeader = `jwt=${match[1]}`;
+  }
   const json = await res.json();
   if (!json.success) throw new Error(`Login failed for ${email}: ${JSON.stringify(json)}`);
-  return json.data;
+  return { user: json.data.user, cookieHeader };
 }
 
-function connectSocket(token) {
+function connectSocket(cookieHeader) {
   return new Promise((resolve, reject) => {
     const socket = io(WS_BASE, {
-      auth: { token },
+      extraHeaders: { Cookie: cookieHeader },
       transports: ['websocket'],
       forceNew: true,
     });
@@ -46,7 +52,7 @@ async function main() {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${coach.token}`,
+      Cookie: coach.cookieHeader,
     },
     body: JSON.stringify({
       name: 'Scenario Test Blitz',
@@ -61,16 +67,16 @@ async function main() {
   // Enroll s3 and s4
   await fetch(`${API_BASE}/tournaments/${tournData.id}/join`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${s3.token}` },
+    headers: { Cookie: s3.cookieHeader },
   });
   await fetch(`${API_BASE}/tournaments/${tournData.id}/join`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${s4.token}` },
+    headers: { Cookie: s4.cookieHeader },
   });
   console.log('✓ Student 3 and Student 4 enrolled\n');
 
-  const sock3 = await connectSocket(s3.token);
-  const sock4 = await connectSocket(s4.token);
+  const sock3 = await connectSocket(s3.cookieHeader);
+  const sock4 = await connectSocket(s4.cookieHeader);
 
   // Scenario 1: One player queues
   console.log('[Scenario 1] One player queues...');
@@ -129,12 +135,13 @@ async function main() {
       status: 'draft',
     }),
   });
-  const draftTourn = (await draftTournRes.json()).data;
+  const draftTournJson = await draftTournRes.json();
+  const draftTournId = draftTournJson.data?.id;
 
   // Student 3 tries to queue for draft tournament
   const draftErr = await new Promise((resolve) => {
     sock3.once('queue:error', resolve);
-    sock3.emit('queue:join', { tournamentId: draftTourn.id });
+    sock3.emit('queue:join', { tournamentId: draftTournId || 'invalid-draft-id' });
   });
   console.log('✓ Draft tournament queue rejected as expected:', draftErr.message);
 

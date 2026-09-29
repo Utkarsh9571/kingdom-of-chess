@@ -9,25 +9,31 @@ async function login(email, password) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   });
+  const setCookie = res.headers.get('set-cookie');
+  let cookieHeader = null;
+  if (setCookie) {
+    const match = setCookie.match(/jwt=([^;]+)/);
+    if (match) cookieHeader = `jwt=${match[1]}`;
+  }
   const json = await res.json();
   if (!json.success) {
     throw new Error(`Login failed for ${email}: ${JSON.stringify(json)}`);
   }
-  return json.data; // { user, token }
+  return { user: json.data.user, cookieHeader };
 }
 
-async function getTournaments(token) {
+async function getTournaments(cookieHeader) {
   const res = await fetch(`${API_BASE}/tournaments`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Cookie: cookieHeader },
   });
   const json = await res.json();
   return json.data;
 }
 
-function connectSocket(token) {
+function connectSocket(cookieHeader) {
   return new Promise((resolve, reject) => {
     const socket = io(WS_BASE, {
-      auth: { token },
+      extraHeaders: { Cookie: cookieHeader },
       transports: ['websocket'],
       forceNew: true,
     });
@@ -60,7 +66,7 @@ async function run() {
   console.log('✓ Student 1, Student 2, Student 3, Coach logged in successfully');
 
   // 2. Fetch tournament
-  const tournaments = await getTournaments(student1.token);
+  const tournaments = await getTournaments(student1.cookieHeader);
   const openTournament = tournaments.find((t) => t.status === 'open' || t.status === 'ongoing');
   if (!openTournament) {
     throw new Error('No open tournament found in seeded data');
@@ -69,10 +75,10 @@ async function run() {
 
   // Connect sockets
   console.log('[2/8] Connecting Socket.IO clients for Student 1 and Student 2...');
-  const socket1 = await connectSocket(student1.token);
-  const socket2 = await connectSocket(student2.token);
-  const socket3 = await connectSocket(student3.token);
-  console.log('✓ Sockets connected and authenticated via handshake token\n');
+  const socket1 = await connectSocket(student1.cookieHeader);
+  const socket2 = await connectSocket(student2.cookieHeader);
+  const socket3 = await connectSocket(student3.cookieHeader);
+  console.log('✓ Sockets connected and authenticated via HTTP cookie\n');
 
   // Test 1: Student 1 queues alone
   console.log('[3/8] Testing single player queue (Student 1 enters queue)...');

@@ -13,42 +13,42 @@ async function loginUser(email, password) {
     throw new Error(`Login failed for ${email}: ${await res.text()}`);
   }
   const setCookie = res.headers.get('set-cookie');
-  let token = null;
+  let cookieHeader = null;
   if (setCookie) {
     const match = setCookie.match(/jwt=([^;]+)/);
-    if (match) token = match[1];
+    if (match) cookieHeader = `jwt=${match[1]}`;
   }
   const data = await res.json();
-  return { user: data.data.user, token };
+  return { user: data.data.user, cookieHeader };
 }
 
-async function getTournaments(token) {
+async function getTournaments(cookieHeader) {
   const res = await fetch(`${BASE_URL}/tournaments`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Cookie: cookieHeader },
   });
   const data = await res.json();
   return data.data;
 }
 
-async function joinTournament(tournamentId, token) {
+async function joinTournament(tournamentId, cookieHeader) {
   const res = await fetch(`${BASE_URL}/tournaments/${tournamentId}/join`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    headers: { Cookie: cookieHeader, 'Content-Type': 'application/json' },
   });
   return res.json();
 }
 
-async function getMatchDetails(matchId, token) {
+async function getMatchDetails(matchId, cookieHeader) {
   const res = await fetch(`${BASE_URL}/matches/${matchId}`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Cookie: cookieHeader },
   });
   const data = await res.json();
   return data.data;
 }
 
-async function getMatchMoves(matchId, token) {
+async function getMatchMoves(matchId, cookieHeader) {
   const res = await fetch(`${BASE_URL}/matches/${matchId}/moves`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Cookie: cookieHeader },
   });
   const data = await res.json();
   return data.data;
@@ -63,7 +63,7 @@ async function run() {
   console.log(`✓ Student 2 logged in: ${student2.user.name} (${student2.user.id})`);
 
   console.log('\n=== STEP 2: Fetching Open Tournament ===');
-  const tournaments = await getTournaments(student1.token);
+  const tournaments = await getTournaments(student1.cookieHeader);
   const tournament = tournaments.find((t) => t.status === 'open' || t.status === 'ongoing');
   if (!tournament) {
     throw new Error('No open/ongoing tournament found! Seed data required.');
@@ -71,17 +71,17 @@ async function run() {
   console.log(`✓ Target Tournament: "${tournament.name}" (${tournament.id}, Time Control: ${tournament.timeControl})`);
 
   // Ensure both enrolled
-  await joinTournament(tournament.id, student1.token);
-  await joinTournament(tournament.id, student2.token);
+  await joinTournament(tournament.id, student1.cookieHeader);
+  await joinTournament(tournament.id, student2.cookieHeader);
   console.log('✓ Both students enrolled in tournament.');
 
-  console.log('\n=== STEP 3: Connecting Socket.IO Clients ===');
+  console.log('\n=== STEP 3: Connecting Socket.IO Clients via HTTP Cookie ===');
   const socket1 = io(SOCKET_URL, {
-    auth: { token: student1.token },
+    extraHeaders: { Cookie: student1.cookieHeader },
     transports: ['websocket'],
   });
   const socket2 = io(SOCKET_URL, {
-    auth: { token: student2.token },
+    extraHeaders: { Cookie: student2.cookieHeader },
     transports: ['websocket'],
   });
 
@@ -184,14 +184,14 @@ async function run() {
   await illegalMovePromise;
 
   console.log('\n=== STEP 8: Testing REST Reconnection & Move History Persistence ===');
-  const matchInDb = await getMatchDetails(matchId, student1.token);
+  const matchInDb = await getMatchDetails(matchId, student1.cookieHeader);
   console.log(`  ✓ REST GET /matches/:id:`);
   console.log(`    Status: ${matchInDb.status}`);
   console.log(`    FEN: ${matchInDb.currentFen}`);
   console.log(`    PGN: ${matchInDb.pgn}`);
   console.log(`    Active Turn: ${matchInDb.activeTurn}`);
 
-  const movesInDb = await getMatchMoves(matchId, student1.token);
+  const movesInDb = await getMatchMoves(matchId, student1.cookieHeader);
   console.log(`  ✓ REST GET /matches/:id/moves returned ${movesInDb.length} moves in PostgreSQL:`);
   movesInDb.forEach((m) => {
     console.log(`    Ply ${m.ply}: ${m.moveNotation} (${m.fromSquare} -> ${m.toSquare})`);
@@ -216,7 +216,7 @@ async function run() {
   }
 
   console.log('\n=== STEP 10: Final Database Verification ===');
-  const finalMatch = await getMatchDetails(matchId, student1.token);
+  const finalMatch = await getMatchDetails(matchId, student1.cookieHeader);
   console.log(`  Status in DB: ${finalMatch.status}`);
   console.log(`  Result in DB: ${finalMatch.result}`);
   console.log(`  Reason in DB: ${finalMatch.reason}`);

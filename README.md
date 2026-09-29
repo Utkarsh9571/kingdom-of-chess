@@ -233,7 +233,7 @@ All REST API endpoints are prefixed with `/api/v1` and follow standardized JSON 
 | Method | Endpoint | Access | Purpose |
 | :--- | :--- | :--- | :--- |
 | `POST` | `/api/v1/auth/login` | Public | Authenticates credentials and sets `jwt` httpOnly cookie. |
-| `POST` | `/api/v1/auth/logout` | Public | Clears `jwt` authentication cookie. |
+| `POST` | `/api/v1/auth/logout` | Authenticated | Clears `jwt` authentication cookie. |
 | `GET` | `/api/v1/auth/me` | Authenticated | Returns currently authenticated user profile. |
 | `GET` | `/api/v1/tournaments` | Authenticated | Lists tournaments (coaches see all statuses; students see open/ongoing/completed). |
 | `POST` | `/api/v1/tournaments` | `COACH` | Creates a new tournament with custom time control. |
