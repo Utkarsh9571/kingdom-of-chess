@@ -513,9 +513,6 @@ export default function StudentTournamentDetailsPage() {
                       </div>
                       <div className="flex-1 truncate">
                         <div className="font-bold text-brand-navy truncate">{p.name}</div>
-                        <div className="text-[10px] text-brand-text-muted truncate font-medium">
-                          {p.email}
-                        </div>
                       </div>
                     </div>
                   ))}

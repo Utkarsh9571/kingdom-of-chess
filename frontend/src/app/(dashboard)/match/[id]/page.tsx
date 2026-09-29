@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Chessboard } from 'react-chessboard';
+import { Chess } from 'chess.js';
 import {
   Clock,
   Swords,
@@ -20,6 +21,7 @@ import {
   RotateCcw,
   Sparkles,
   XCircle,
+  MousePointerClick,
 } from 'lucide-react';
 import { api, MatchDetails } from '@/lib/api';
 import { Navbar } from '@/components/Navbar';
@@ -94,6 +96,10 @@ export default function MatchArenaPage() {
   const [showResignModal, setShowResignModal] = useState(false);
   const [isResigning, setIsResigning] = useState(false);
 
+  // Click-to-move square selection state
+  const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
+  const [possibleMoves, setPossibleMoves] = useState<string[]>([]);
+
   // Wall-clock ticker to update displayed timers without drift
   const [now, setNow] = useState(Date.now());
 
@@ -113,12 +119,33 @@ export default function MatchArenaPage() {
   // Keep state synced with REST response
   useEffect(() => {
     if (initialMatch) {
-      setMatchState(initialMatch);
-      setUserColor(initialMatch.userRole);
+      setMatchState((prev) => ({
+        ...prev,
+        ...initialMatch,
+        currentFen: initialMatch.currentFen || (initialMatch as any).fen || prev?.currentFen,
+      }));
+      if (initialMatch.userRole) {
+        setUserColor(initialMatch.userRole);
+      }
     }
   }, [initialMatch]);
 
   const activeMatch = matchState || initialMatch;
+
+  // Normalized authoritative FEN string
+  const currentFen = useMemo(() => {
+    return (
+      activeMatch?.currentFen ||
+      (activeMatch as any)?.fen ||
+      'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+    );
+  }, [activeMatch?.currentFen, (activeMatch as any)?.fen]);
+
+  // Clear piece selection whenever position advances
+  useEffect(() => {
+    setSelectedSquare(null);
+    setPossibleMoves([]);
+  }, [currentFen]);
 
   // Local ticker for live clocks while in_progress
   useEffect(() => {
@@ -141,11 +168,12 @@ export default function MatchArenaPage() {
       setJoinError(null);
       if (data.color === 'w') setUserColor('white');
       else if (data.color === 'b') setUserColor('black');
-      else setUserColor('observer');
+      else if (data.color === 'observer') setUserColor('observer');
 
       setMatchState((prev) => ({
         ...prev,
         ...data,
+        currentFen: data.fen || data.currentFen || prev?.currentFen,
       }));
     };
 
@@ -154,6 +182,7 @@ export default function MatchArenaPage() {
       setMatchState((prev) => ({
         ...prev,
         ...data,
+        currentFen: data.fen || data.currentFen || prev?.currentFen,
       }));
       setMoveError(null);
     };
@@ -163,6 +192,7 @@ export default function MatchArenaPage() {
       setMatchState((prev) => ({
         ...prev,
         ...data,
+        currentFen: data.fen || data.currentFen || prev?.currentFen,
       }));
       setMoveError(null);
     };
@@ -178,6 +208,8 @@ export default function MatchArenaPage() {
         pgn: data.pgn || prev?.pgn,
       }));
       setShowResignModal(false);
+      setSelectedSquare(null);
+      setPossibleMoves([]);
     };
 
     const handleMatchError = (err: { code: string; message: string }) => {
@@ -237,35 +269,217 @@ export default function MatchArenaPage() {
     ((userColor === 'white' && activeMatch?.activeTurn === 'w') ||
       (userColor === 'black' && activeMatch?.activeTurn === 'b'));
 
+  // Common move execution logic for both Drag-and-Drop and Click-to-Move
+  const executeMove = (from: string, to: string, pieceStr?: string): boolean => {
+    if (!socket || !id) return false;
+
+    if (activeMatch?.status !== 'in_progress') {
+      setMoveError('This match has ended. Pieces cannot be moved.');
+      setTimeout(() => setMoveError(null), 3500);
+      return false;
+    }
+
+    if (userColor !== 'white' && userColor !== 'black') {
+      setMoveError('Observers and coaches cannot make moves in player matches.');
+      setTimeout(() => setMoveError(null), 3500);
+      return false;
+    }
+
+    if (!isMyTurn) {
+      const waitingMsg =
+        userColor === 'black' && activeMatch?.activeTurn === 'w'
+          ? "It is White's turn to move first! (You are playing Black)"
+          : `It is currently ${activeMatch?.activeTurn === 'w' ? 'White' : 'Black'}'s turn to move.`;
+      setMoveError(waitingMsg);
+      setTimeout(() => setMoveError(null), 3500);
+      return false;
+    }
+
+    try {
+      const chess = new Chess(currentFen);
+      const pieceOnBoard = chess.get(from as any);
+      if (!pieceOnBoard) return false;
+
+      // Color verification
+      if (
+        (userColor === 'white' && pieceOnBoard.color !== 'w') ||
+        (userColor === 'black' && pieceOnBoard.color !== 'b')
+      ) {
+        setMoveError(`You are playing ${userColor}. You can only move your own pieces.`);
+        setTimeout(() => setMoveError(null), 3500);
+        return false;
+      }
+
+      // Detect pawn promotion
+      const isPawn = pieceOnBoard.type === 'p';
+      const isPromotion =
+        isPawn &&
+        ((pieceOnBoard.color === 'w' && to.endsWith('8')) ||
+          (pieceOnBoard.color === 'b' && to.endsWith('1')));
+      const promotion = isPromotion ? 'q' : undefined;
+
+      // Test move validity locally
+      const validMove = chess.move({
+        from: from as any,
+        to: to as any,
+        promotion,
+      });
+
+      if (!validMove) {
+        setMoveError('Illegal chess move.');
+        setTimeout(() => setMoveError(null), 3000);
+        return false;
+      }
+
+      // Legal move verified: emit authoritative socket event
+      socket.emit('match:move', {
+        matchId: id,
+        from,
+        to,
+        promotion,
+      });
+
+      setSelectedSquare(null);
+      setPossibleMoves([]);
+      setMoveError(null);
+      return true;
+    } catch {
+      setMoveError('Invalid move attempt.');
+      setTimeout(() => setMoveError(null), 3000);
+      return false;
+    }
+  };
+
+  // Click-to-Move Handler
+  const onSquareClick = (square: string) => {
+    if (activeMatch?.status !== 'in_progress') {
+      setMoveError('Match is completed. Pieces cannot be moved.');
+      setTimeout(() => setMoveError(null), 3500);
+      return;
+    }
+
+    if (!isMyTurn) {
+      const msg =
+        userColor === 'black' && activeMatch?.activeTurn === 'w'
+          ? "It is White's turn to move first! (You are playing Black)"
+          : `Waiting for opponent (${activeMatch?.activeTurn === 'w' ? 'White' : 'Black'}) to move.`;
+      setMoveError(msg);
+      setTimeout(() => setMoveError(null), 3500);
+      return;
+    }
+
+    const chess = new Chess(currentFen);
+    const piece = chess.get(square as any);
+
+    // Case 1: Square was already selected
+    if (selectedSquare) {
+      if (selectedSquare === square) {
+        // Deselect
+        setSelectedSquare(null);
+        setPossibleMoves([]);
+        return;
+      }
+
+      // If clicked another one of user's own pieces, switch selection
+      const isOwnPiece =
+        piece &&
+        ((userColor === 'white' && piece.color === 'w') ||
+          (userColor === 'black' && piece.color === 'b'));
+
+      if (isOwnPiece) {
+        setSelectedSquare(square);
+        const moves = chess.moves({ square: square as any, verbose: true });
+        setPossibleMoves(moves.map((m) => m.to));
+        return;
+      }
+
+      // Attempt move to destination square
+      const moved = executeMove(selectedSquare, square);
+      if (!moved) {
+        setSelectedSquare(null);
+        setPossibleMoves([]);
+      }
+      return;
+    }
+
+    // Case 2: No square selected yet - attempt piece selection
+    if (!piece) return;
+
+    const isOwnPiece =
+      (userColor === 'white' && piece.color === 'w') ||
+      (userColor === 'black' && piece.color === 'b');
+
+    if (!isOwnPiece) {
+      setMoveError(`You are playing ${userColor} — please select your own pieces.`);
+      setTimeout(() => setMoveError(null), 3000);
+      return;
+    }
+
+    setSelectedSquare(square);
+    const moves = chess.moves({ square: square as any, verbose: true });
+    setPossibleMoves(moves.map((m) => m.to));
+  };
+
+  // Drag-and-drop piece filter
   const isDraggablePiece = ({ piece }: { piece: string }) => {
     if (activeMatch?.status !== 'in_progress') return false;
-    if (!isMyTurn) return false;
+    // Allow dragging user's own pieces so that turns & rules are validated with friendly instant feedback
     if (userColor === 'white' && piece.startsWith('w')) return true;
     if (userColor === 'black' && piece.startsWith('b')) return true;
     return false;
   };
 
-  // Handle piece drop with auto queen promotion
+  // Drag-and-drop drop handler
   const onPieceDrop = (sourceSquare: string, targetSquare: string, piece: string): boolean => {
-    if (!isMyTurn || activeMatch?.status !== 'in_progress') return false;
-
-    // Detect pawn promotion
-    const isPawn = piece[1]?.toLowerCase() === 'p';
-    const isPromotion =
-      isPawn &&
-      ((piece[0] === 'w' && targetSquare.endsWith('8')) ||
-        (piece[0] === 'b' && targetSquare.endsWith('1')));
-    const promotion = isPromotion ? 'q' : undefined;
-
-    socket?.emit('match:move', {
-      matchId: id,
-      from: sourceSquare,
-      to: targetSquare,
-      promotion,
-    });
-
-    return true;
+    return executeMove(sourceSquare, targetSquare, piece);
   };
+
+  // Dynamic square styling (selection glow, valid move dots, check indicator)
+  const customSquareStyles = useMemo(() => {
+    const styles: Record<string, React.CSSProperties> = {};
+
+    // 1. Highlight selected square
+    if (selectedSquare) {
+      styles[selectedSquare] = {
+        backgroundColor: 'rgba(255, 107, 0, 0.45)',
+        boxShadow: 'inset 0 0 0 3px #FF6B00',
+      };
+    }
+
+    // 2. Highlight legal destinations with subtle amber dots
+    for (const sq of possibleMoves) {
+      styles[sq] = {
+        background:
+          'radial-gradient(circle, rgba(255, 107, 0, 0.75) 25%, transparent 26%)',
+        cursor: 'pointer',
+      };
+    }
+
+    // 3. Highlight king in check
+    try {
+      const chess = new Chess(currentFen);
+      if (chess.isCheck()) {
+        const turn = chess.turn();
+        const board = chess.board();
+        for (let r = 0; r < 8; r++) {
+          for (let c = 0; c < 8; c++) {
+            const p = board[r][c];
+            if (p && p.type === 'k' && p.color === turn) {
+              const file = String.fromCharCode(97 + c);
+              const rank = 8 - r;
+              const kingSq = `${file}${rank}`;
+              styles[kingSq] = {
+                backgroundColor: 'rgba(239, 68, 68, 0.55)',
+                boxShadow: '0 0 12px 3px rgba(239, 68, 68, 0.8)',
+              };
+            }
+          }
+        }
+      }
+    } catch {}
+
+    return styles;
+  }, [selectedSquare, possibleMoves, currentFen]);
 
   const handleResign = () => {
     if (!socket || !id || isResigning) return;
@@ -302,7 +516,7 @@ export default function MatchArenaPage() {
       title = 'Victory! You Won';
       subtitle =
         reason === 'checkmate'
-          ? 'Checkmate! Beautiful checkmate.'
+          ? 'Checkmate! Outstanding play.'
           : reason === 'timeout'
           ? 'Opponent ran out of time.'
           : 'Opponent resigned.';
@@ -384,7 +598,7 @@ export default function MatchArenaPage() {
           </div>
         </div>
 
-        {/* Error States */}
+        {/* Informative Alerts & Move Feedback */}
         {joinError && (
           <div className="rounded-2xl border border-destructive/30 bg-brand-pink-light p-4 text-xs font-bold text-destructive flex items-center gap-3">
             <AlertCircle className="h-5 w-5 shrink-0" />
@@ -396,9 +610,9 @@ export default function MatchArenaPage() {
         )}
 
         {moveError && (
-          <div className="rounded-2xl border border-destructive/30 bg-brand-pink-light p-3.5 text-xs font-bold text-destructive flex items-center gap-2.5 animate-bounce">
-            <XCircle className="h-4 w-4 shrink-0" />
-            <span>Move Rejected: {moveError}</span>
+          <div className="rounded-2xl border border-destructive/30 bg-brand-pink-light p-3.5 text-xs font-bold text-destructive flex items-center gap-2.5 shadow-soft">
+            <XCircle className="h-4 w-4 shrink-0 text-destructive" />
+            <span>{moveError}</span>
           </div>
         )}
 
@@ -485,18 +699,82 @@ export default function MatchArenaPage() {
                 </div>
               </div>
 
+              {/* Dynamic Turn & Interaction Guide Banner */}
+              {activeMatch.status === 'in_progress' && (
+                <div
+                  className={`w-full max-w-[560px] rounded-2xl p-3 border flex items-center justify-between shadow-soft transition-all ${
+                    isMyTurn
+                      ? 'bg-gradient-to-r from-brand-orange-light via-white to-brand-cream border-brand-orange text-brand-navy'
+                      : 'bg-white border-brand-border text-brand-text-muted'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className={`h-2.5 w-2.5 rounded-full shrink-0 ${
+                        isMyTurn ? 'bg-brand-orange animate-ping' : 'bg-slate-400'
+                      }`}
+                    />
+                    <div className="font-extrabold text-xs sm:text-sm text-brand-navy flex items-center gap-1.5 flex-wrap">
+                      {isMyTurn ? (
+                        <>
+                          <span className="text-brand-orange font-black">Your Turn!</span>
+                          <span className="text-[11px] font-semibold text-brand-text-muted flex items-center gap-1">
+                            <MousePointerClick className="h-3 w-3" />
+                            Drag piece or click to select &amp; move
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Waiting for Opponent</span>
+                          <span className="text-[11px] font-semibold text-brand-text-muted">
+                            ({activeMatch.activeTurn === 'w' ? 'White' : 'Black'} to move)
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-[11px] font-extrabold px-2.5 py-1 rounded-xl border bg-white shadow-sm shrink-0">
+                    {userColor === 'white' ? (
+                      <span className="text-brand-navy">You: White ♔</span>
+                    ) : userColor === 'black' ? (
+                      <span className="text-brand-navy">You: Black ♚</span>
+                    ) : (
+                      <span className="text-brand-text-muted">Spectating</span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Concluded Match Banner */}
+              {activeMatch.status === 'completed' && (
+                <div className="w-full max-w-[560px] rounded-2xl p-3.5 border border-brand-border bg-white flex items-center justify-between shadow-soft text-xs">
+                  <div className="flex items-center gap-2.5 font-bold text-brand-navy">
+                    <CheckCircle2 className="h-4 w-4 text-brand-teal shrink-0" />
+                    <span>Match has concluded. The board is now view-only.</span>
+                  </div>
+                  {activeMatch.tournamentId && (
+                    <Link
+                      href={`/student/tournaments/${activeMatch.tournamentId}`}
+                      className="rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-white font-extrabold text-[11px] px-3.5 py-1.5 shadow-sm transition-all shrink-0 ml-2"
+                    >
+                      Play Again
+                    </Link>
+                  )}
+                </div>
+              )}
+
               {/* Dedicated Chessboard Container */}
               <div className="w-full max-w-[560px] aspect-square rounded-3xl overflow-hidden border-4 border-white shadow-soft-lg bg-white flex items-center justify-center p-1.5 sm:p-2">
                 <div className="w-full h-full rounded-2xl overflow-hidden border border-brand-border/60">
                   <Chessboard
-                    position={
-                      activeMatch.currentFen ||
-                      'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-                    }
+                    position={currentFen}
                     boardOrientation={boardOrientation}
-                    arePiecesDraggable={isMyTurn && activeMatch.status === 'in_progress'}
+                    arePiecesDraggable={activeMatch.status === 'in_progress'}
                     isDraggablePiece={isDraggablePiece}
                     onPieceDrop={onPieceDrop}
+                    onSquareClick={onSquareClick}
+                    customSquareStyles={customSquareStyles}
                     customBoardStyle={{
                       borderRadius: '12px',
                     }}
@@ -596,7 +874,7 @@ export default function MatchArenaPage() {
                   </div>
                 </div>
 
-                {/* Structured Move List (Phase 10) */}
+                {/* Structured Move List */}
                 <div className="space-y-2 pt-2">
                   <div className="flex items-center justify-between">
                     <div className="text-xs font-bold text-brand-navy uppercase tracking-wider">
@@ -626,7 +904,7 @@ export default function MatchArenaPage() {
                       </div>
                     ) : (
                       <div className="h-full flex items-center justify-center text-brand-text-muted text-center py-8 font-medium">
-                        Paired & synchronized. Moves will record here during play.
+                        Paired &amp; synchronized. Moves will record here during play.
                       </div>
                     )}
                   </div>
