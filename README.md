@@ -1,6 +1,14 @@
-# Kingdom of Chess — Real-Time Live Tournament Platform
+# Kingdom of Chess
+
+A real-time online chess tournament platform built as a take-home assignment.
 
 > **Kingdom of Chess** is an online chess academy for kids in India. This repository delivers the completed full-stack tournament module featuring live 1-on-1 gameplay where coaches manage tournaments, students join and auto-match, players compete on a real-time synchronized chessboard with shared countdown clocks and increments, and match outcomes dynamically update tournament leaderboards.
+
+## Live Demo
+
+- **Frontend:** https://kingdom-of-chess-theta.vercel.app/
+- **Backend:** https://backend-production-fef7c.up.railway.app
+- **Source Code:** https://github.com/Utkarsh9571/kingdom-of-chess
 
 ---
 
