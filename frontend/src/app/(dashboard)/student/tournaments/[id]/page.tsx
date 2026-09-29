@@ -4,6 +4,18 @@ import React, { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  Swords,
+  ArrowLeft,
+  Clock,
+  Users,
+  Calendar,
+  CheckCircle2,
+  AlertCircle,
+  Sparkles,
+  Loader2,
+  Trophy,
+} from 'lucide-react';
 import { api } from '@/lib/api';
 import { Navbar } from '@/components/Navbar';
 import { useSocket } from '@/context/SocketContext';
@@ -27,7 +39,12 @@ export default function StudentTournamentDetailsPage() {
 
   const isCurrentTournamentQueued = isQueueing && queuedTournamentId === id;
 
-  const { data: tournament, isLoading, isError, error } = useQuery({
+  const {
+    data: tournament,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
     queryKey: ['tournament', id],
     queryFn: () => api.getTournament(id),
     enabled: !!id,
@@ -46,97 +63,116 @@ export default function StudentTournamentDetailsPage() {
   });
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-brand-cream flex flex-col selection:bg-brand-orange/20 selection:text-brand-navy">
       <Navbar />
 
-      <main className="container mx-auto flex-1 p-4 sm:p-6 space-y-6">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Link href="/student/tournaments" className="hover:text-primary transition-colors">
-            ← Back to All Tournaments
+      <main className="container mx-auto flex-1 p-4 sm:p-8 space-y-8 max-w-7xl">
+        {/* Navigation Breadcrumb */}
+        <div className="flex items-center gap-2 text-xs font-bold text-brand-text-muted">
+          <Link
+            href="/student/tournaments"
+            className="inline-flex items-center gap-1 hover:text-brand-orange transition-colors"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Back to All Tournaments</span>
           </Link>
         </div>
 
         {/* Loading State */}
         {isLoading && (
-          <div className="space-y-4 animate-pulse">
-            <div className="h-8 w-1/3 bg-muted rounded" />
-            <div className="h-32 bg-muted rounded-xl" />
-            <div className="h-64 bg-muted rounded-xl" />
+          <div className="space-y-6 animate-pulse">
+            <div className="h-8 w-1/3 bg-brand-cream-dark rounded-full" />
+            <div className="h-32 bg-white rounded-3xl shadow-soft" />
+            <div className="h-64 bg-white rounded-3xl shadow-soft" />
           </div>
         )}
 
         {/* Error State */}
         {isError && (
-          <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
-            Failed to load tournament: {(error as Error).message}
+          <div className="rounded-2xl border border-destructive/30 bg-brand-pink-light p-5 text-sm font-semibold text-destructive flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 shrink-0" />
+            <span>Failed to load tournament: {(error as Error).message}</span>
           </div>
         )}
 
         {/* Notification Message */}
         {msg && (
           <div
-            className={`rounded-md p-3 text-xs ${
+            className={`rounded-2xl p-4 text-xs font-bold flex items-center gap-2.5 ${
               msg.type === 'success'
-                ? 'border border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-                : 'border border-destructive/40 bg-destructive/10 text-destructive'
+                ? 'border border-brand-teal/30 bg-brand-teal-light text-brand-teal'
+                : 'border border-destructive/30 bg-brand-pink-light text-destructive'
             }`}
           >
-            {msg.text}
+            {msg.type === 'success' ? (
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+            ) : (
+              <AlertCircle className="h-4 w-4 shrink-0" />
+            )}
+            <span>{msg.text}</span>
           </div>
         )}
 
         {/* Tournament Content */}
         {!isLoading && !isError && tournament && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border pb-6">
-              <div>
-                <div className="flex items-center gap-3">
-                  <h1 className="text-2xl sm:text-3xl font-bold text-foreground">{tournament.name}</h1>
+          <div className="space-y-8">
+            {/* Title & Action Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-brand-border pb-6">
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center gap-3">
+                  <h1 className="text-2xl sm:text-4xl font-extrabold text-brand-navy tracking-tight">
+                    {tournament.name}
+                  </h1>
                   <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide border ${
+                    className={`rounded-full px-3.5 py-1 text-xs font-bold uppercase tracking-wide border ${
                       tournament.status === 'open'
-                        ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800'
+                        ? 'bg-brand-teal-light text-brand-teal border-brand-teal/30'
                         : tournament.status === 'ongoing'
-                        ? 'bg-amber-950/80 text-amber-400 border-amber-800 animate-pulse'
-                        : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                        ? 'bg-brand-orange-light text-brand-orange border-brand-orange/30'
+                        : 'bg-brand-cream-dark text-brand-text-muted border-brand-border'
                     }`}
                   >
                     {tournament.status}
                   </span>
                 </div>
-                <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                  Time Control: <span className="font-semibold text-foreground">{tournament.timeControl}</span> (
+                <p className="text-xs sm:text-sm text-brand-text-muted font-medium">
+                  Time Control:{' '}
+                  <span className="font-extrabold text-brand-navy">{tournament.timeControl}</span> (
                   {tournament.initialTimeSeconds / 60} min each, {tournament.incrementSeconds}s increment)
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
+              {/* Tournament Enrollment / Matchmaking CTAs */}
+              <div className="flex flex-wrap items-center gap-3 self-start sm:self-auto">
                 {tournament.isEnrolled ? (
                   <>
-                    <div className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 text-xs font-semibold text-emerald-400">
-                      <span>✓</span> Enrolled
+                    <div className="inline-flex items-center gap-1.5 rounded-full bg-brand-teal-light border border-brand-teal/30 px-4 py-2 text-xs font-bold text-brand-teal">
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span>Enrolled</span>
                     </div>
 
-                    {(tournament.status === 'open' || tournament.status === 'ongoing') && !isCurrentTournamentQueued && (
-                      <button
-                        onClick={() => joinMatchmaking(tournament.id)}
-                        disabled={!isConnected || (isQueueing && !isCurrentTournamentQueued)}
-                        className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-bold text-zinc-950 hover:bg-amber-400 shadow-md shadow-amber-500/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
-                      >
-                        <span>⚔️</span> Find Opponent
-                      </button>
-                    )}
+                    {(tournament.status === 'open' || tournament.status === 'ongoing') &&
+                      !isCurrentTournamentQueued && (
+                        <button
+                          onClick={() => joinMatchmaking(tournament.id)}
+                          disabled={!isConnected || (isQueueing && !isCurrentTournamentQueued)}
+                          className="inline-flex items-center gap-2 rounded-full bg-brand-orange px-7 py-3 text-sm font-extrabold text-white shadow-orange hover:bg-brand-orange-hover hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                        >
+                          <Swords className="h-4 w-4" />
+                          <span>Find Opponent</span>
+                        </button>
+                      )}
                   </>
                 ) : tournament.status === 'open' ? (
                   <button
                     onClick={() => joinMutation.mutate()}
                     disabled={joinMutation.isPending}
-                    className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 shadow disabled:opacity-50 transition-colors"
+                    className="inline-flex items-center gap-2 rounded-full bg-brand-orange px-7 py-3 text-sm font-extrabold text-white shadow-orange hover:bg-brand-orange-hover hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer"
                   >
                     {joinMutation.isPending ? 'Enrolling...' : 'Join Tournament'}
                   </button>
                 ) : (
-                  <div className="rounded-lg bg-muted px-4 py-2 text-xs font-medium text-muted-foreground">
+                  <div className="rounded-full bg-brand-cream-dark border border-brand-border px-4 py-2 text-xs font-bold text-brand-text-muted">
                     Enrollment Closed
                   </div>
                 )}
@@ -145,14 +181,14 @@ export default function StudentTournamentDetailsPage() {
 
             {/* Queue Error Banner */}
             {queueError && (
-              <div className="flex items-center justify-between rounded-lg border border-destructive/50 bg-destructive/10 p-3.5 text-xs text-destructive">
+              <div className="flex items-center justify-between rounded-2xl border border-destructive/30 bg-brand-pink-light p-4 text-xs font-bold text-destructive">
                 <div className="flex items-center gap-2">
-                  <span className="text-base">⚠️</span>
-                  <span className="font-medium">{queueError}</span>
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{queueError}</span>
                 </div>
                 <button
                   onClick={clearQueueError}
-                  className="rounded px-2 py-0.5 text-muted-foreground hover:bg-destructive/20 hover:text-destructive font-bold transition-colors"
+                  className="rounded-full px-2.5 py-0.5 text-destructive hover:bg-destructive/10 transition-colors"
                 >
                   Dismiss
                 </button>
@@ -161,25 +197,29 @@ export default function StudentTournamentDetailsPage() {
 
             {/* Live Queue Waiting Banner */}
             {isCurrentTournamentQueued && (
-              <div className="rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2">
-                <div className="flex items-center gap-4">
-                  <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-500/20 border border-amber-500/50">
-                    <span className="text-xl animate-spin">⏱️</span>
-                    <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-20 animate-ping" />
+              <div className="rounded-3xl border border-brand-orange/40 bg-gradient-to-r from-brand-orange-light via-brand-cream to-white p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-soft animate-in fade-in">
+                <div className="flex items-center gap-5">
+                  <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand-orange text-white shadow-md shadow-brand-orange/25">
+                    <Loader2 className="h-7 w-7 animate-spin" />
+                    <span className="absolute inline-flex h-full w-full rounded-2xl bg-brand-orange opacity-20 animate-ping" />
                   </div>
-                  <div>
-                    <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
-                      Searching for opponent...
-                      <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Waiting in pool for {tournament.name}. You will be paired automatically as soon as an eligible student queues.
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-extrabold text-brand-navy">
+                        Searching for an opponent...
+                      </h3>
+                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-brand-orange animate-pulse" />
+                    </div>
+                    <p className="text-xs text-brand-text-muted font-medium">
+                      Waiting in pool for {tournament.name}. You will be paired automatically as soon
+                      as an eligible student queues.
                     </p>
                   </div>
                 </div>
+
                 <button
                   onClick={() => leaveMatchmaking(tournament.id)}
-                  className="shrink-0 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-2 text-xs font-semibold text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all"
+                  className="shrink-0 rounded-full border border-destructive/30 bg-white px-5 py-2.5 text-xs font-bold text-destructive hover:bg-brand-pink-light transition-all cursor-pointer shadow-sm"
                 >
                   Cancel Queue
                 </button>
@@ -188,14 +228,14 @@ export default function StudentTournamentDetailsPage() {
 
             {/* Queued in another tournament notice */}
             {isQueueing && !isCurrentTournamentQueued && queuedTournamentId && (
-              <div className="flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-300">
+              <div className="flex items-center justify-between rounded-2xl border border-amber-300 bg-brand-yellow-light p-4 text-xs font-bold text-brand-navy">
                 <div className="flex items-center gap-2">
-                  <span>⏳</span>
-                  <span>You are currently in matchmaking for another tournament.</span>
+                  <Clock className="h-4 w-4 text-brand-orange shrink-0" />
+                  <span>You are currently waiting in matchmaking for another tournament.</span>
                 </div>
                 <button
                   onClick={() => leaveMatchmaking(queuedTournamentId)}
-                  className="rounded px-2.5 py-1 text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 transition-colors"
+                  className="rounded-full bg-white px-3 py-1 text-xs font-bold border border-brand-border hover:bg-brand-cream transition-colors"
                 >
                   Cancel other queue
                 </button>
@@ -203,57 +243,83 @@ export default function StudentTournamentDetailsPage() {
             )}
 
             {/* Status Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <div className="rounded-xl border border-border bg-card p-4">
-                <div className="text-xs text-muted-foreground">Tournament Status</div>
-                <div className="text-lg font-bold capitalize text-foreground mt-1">{tournament.status}</div>
-                <div className="text-xs text-muted-foreground">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-5">
+              <div className="rounded-3xl border border-brand-border bg-white p-5 shadow-soft space-y-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-brand-text-muted">
+                  <Trophy className="h-3.5 w-3.5 text-brand-orange" />
+                  <span>Tournament Status</span>
+                </div>
+                <div className="text-xl font-extrabold capitalize text-brand-navy mt-1">
+                  {tournament.status}
+                </div>
+                <div className="text-[11px] text-brand-text-muted font-medium">
                   {tournament.status === 'open'
                     ? 'Registration open'
                     : tournament.status === 'ongoing'
-                    ? 'Matches currently in progress'
+                    ? 'Matches in progress'
                     : 'Event completed'}
                 </div>
               </div>
 
-              <div className="rounded-xl border border-border bg-card p-4">
-                <div className="text-xs text-muted-foreground">Total Competitors</div>
-                <div className="text-lg font-bold text-foreground mt-1">
+              <div className="rounded-3xl border border-brand-border bg-white p-5 shadow-soft space-y-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-brand-text-muted">
+                  <Users className="h-3.5 w-3.5 text-brand-teal" />
+                  <span>Total Competitors</span>
+                </div>
+                <div className="text-xl font-extrabold text-brand-navy mt-1">
                   {tournament.participantsCount} Players
                 </div>
-                <div className="text-xs text-muted-foreground">Enrolled academy students</div>
+                <div className="text-[11px] text-brand-text-muted font-medium">
+                  Enrolled academy students
+                </div>
               </div>
 
-              <div className="rounded-xl border border-border bg-card p-4 col-span-2 sm:col-span-1">
-                <div className="text-xs text-muted-foreground">Start Time</div>
-                <div className="text-sm font-semibold text-foreground mt-1">
+              <div className="rounded-3xl border border-brand-border bg-white p-5 shadow-soft space-y-1 col-span-2 sm:col-span-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-brand-text-muted">
+                  <Calendar className="h-3.5 w-3.5 text-brand-green" />
+                  <span>Start Time</span>
+                </div>
+                <div className="text-base font-bold text-brand-navy mt-1">
                   {new Date(tournament.startDate).toLocaleDateString()}
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {new Date(tournament.startDate).toLocaleTimeString()}
+                <div className="text-[11px] text-brand-text-muted font-medium">
+                  {new Date(tournament.startDate).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
                 </div>
               </div>
             </div>
 
-            {/* Enrolled Participant List */}
-            <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-              <h2 className="text-lg font-bold text-foreground">Enrolled Students</h2>
+            {/* Enrolled Competitors Roster */}
+            <div className="rounded-3xl border border-brand-border bg-white p-6 sm:p-8 shadow-soft space-y-6">
+              <div>
+                <h2 className="text-xl font-extrabold text-brand-navy">Enrolled Competitors</h2>
+                <p className="text-xs text-brand-text-muted font-medium mt-0.5">
+                  Students ready to compete in {tournament.name}
+                </p>
+              </div>
+
               {!tournament.participants || tournament.participants.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
+                <div className="rounded-2xl border border-dashed border-brand-border p-10 text-center text-xs text-brand-text-muted font-medium">
                   No competitors enrolled yet. Be the first to join!
                 </div>
               ) : (
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {tournament.participants.map((p, idx) => (
                     <div
                       key={p.participantId}
-                      className="flex items-center gap-3 rounded-lg border border-border bg-background p-3 text-xs"
+                      className="flex items-center gap-3 rounded-2xl border border-brand-border bg-brand-cream/30 p-3.5 text-xs hover:border-brand-orange/30 transition-colors"
                     >
-                      <span className="font-bold text-muted-foreground w-4">{idx + 1}.</span>
-                      <span className="text-emerald-400">♟</span>
+                      <span className="font-extrabold text-brand-text-muted w-4">{idx + 1}.</span>
+                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-teal-light text-brand-teal text-sm">
+                        ♟
+                      </div>
                       <div className="flex-1 truncate">
-                        <div className="font-medium text-foreground truncate">{p.name}</div>
-                        <div className="text-[10px] text-muted-foreground truncate">{p.email}</div>
+                        <div className="font-bold text-brand-navy truncate">{p.name}</div>
+                        <div className="text-[10px] text-brand-text-muted truncate font-medium">
+                          {p.email}
+                        </div>
                       </div>
                     </div>
                   ))}

@@ -2,12 +2,14 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Crown, LogOut, ArrowRight, Trophy, Swords, User } from 'lucide-react';
 import { api } from '@/lib/api';
 
 export function Navbar() {
   const router = useRouter();
+  const pathname = usePathname();
   const queryClient = useQueryClient();
 
   const { data: user } = useQuery({
@@ -24,65 +26,106 @@ export function Navbar() {
     },
   });
 
+  const isCoach = user?.role === 'COACH';
+
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-card/80 backdrop-blur">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6">
-        <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-2 font-bold text-lg text-primary tracking-wide">
-            <span className="text-2xl">♚</span>
-            <span>Kingdom of Chess</span>
+    <header className="sticky top-0 z-40 border-b border-brand-border bg-white/90 backdrop-blur-md transition-all shadow-[0_2px_12px_rgba(3,40,61,0.04)]">
+      <div className="container mx-auto flex h-20 items-center justify-between px-4 sm:px-8 max-w-7xl">
+        {/* Brand Logo */}
+        <div className="flex items-center gap-8">
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-orange to-[#FF8533] text-white shadow-md shadow-brand-orange/25 group-hover:scale-105 transition-transform">
+              <Crown className="h-6 w-6 stroke-[2.2]" />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-extrabold text-lg tracking-tight text-brand-navy leading-none">
+                KINGDOM
+              </span>
+              <span className="text-[11px] font-bold tracking-[0.2em] text-brand-orange leading-none mt-1">
+                OF CHESS
+              </span>
+            </div>
           </Link>
 
+          {/* Navigation Links for Authenticated Users */}
           {user && (
-            <nav className="hidden sm:flex items-center gap-4 text-sm font-medium">
-              {user.role === 'COACH' ? (
+            <nav className="hidden md:flex items-center gap-2 text-sm font-semibold">
+              {isCoach ? (
                 <Link
                   href="/coach/tournaments"
-                  className="text-foreground/90 hover:text-primary transition-colors"
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
+                    pathname?.startsWith('/coach')
+                      ? 'bg-brand-cream-dark text-brand-navy font-bold'
+                      : 'text-brand-text-muted hover:text-brand-navy hover:bg-brand-cream'
+                  }`}
                 >
-                  Manage Tournaments
+                  <Trophy className="h-4 w-4 text-brand-orange" />
+                  <span>Tournament Management</span>
                 </Link>
               ) : (
                 <Link
                   href="/student/tournaments"
-                  className="text-foreground/90 hover:text-primary transition-colors"
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
+                    pathname?.startsWith('/student')
+                      ? 'bg-brand-cream-dark text-brand-navy font-bold'
+                      : 'text-brand-text-muted hover:text-brand-navy hover:bg-brand-cream'
+                  }`}
                 >
-                  Browse Tournaments
+                  <Swords className="h-4 w-4 text-brand-orange" />
+                  <span>Browse Tournaments</span>
                 </Link>
               )}
             </nav>
           )}
         </div>
 
-        <div className="flex items-center gap-4">
+        {/* Right CTA / Profile Action */}
+        <div className="flex items-center gap-3 sm:gap-4">
           {user ? (
             <div className="flex items-center gap-3">
-              <div className="text-right">
-                <div className="text-sm font-medium text-foreground">{user.name}</div>
-                <div className="text-xs text-muted-foreground flex items-center justify-end gap-1">
-                  <span
-                    className={`inline-block h-1.5 w-1.5 rounded-full ${
-                      user.role === 'COACH' ? 'bg-amber-400' : 'bg-emerald-400'
-                    }`}
-                  />
-                  <span>{user.role}</span>
+              <div className="flex items-center gap-2.5 rounded-full border border-brand-border bg-brand-cream/60 py-1.5 pl-2.5 pr-4 shadow-sm">
+                <div
+                  className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm ${
+                    isCoach ? 'bg-brand-navy' : 'bg-brand-teal'
+                  }`}
+                >
+                  {isCoach ? <Crown className="h-4 w-4" /> : <User className="h-4 w-4" />}
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-xs font-bold text-brand-navy leading-tight line-clamp-1 max-w-[120px] sm:max-w-none">
+                    {user.name}
+                  </span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-brand-text-muted">
+                    {user.role}
+                  </span>
                 </div>
               </div>
+
               <button
                 onClick={() => logoutMutation.mutate()}
                 disabled={logoutMutation.isPending}
-                className="rounded-md border border-border bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
+                title="Sign out of account"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-brand-border bg-white text-brand-text-muted hover:text-destructive hover:border-destructive/30 hover:bg-destructive/5 transition-colors shadow-sm disabled:opacity-50"
               >
-                {logoutMutation.isPending ? 'Logging out...' : 'Logout'}
+                <LogOut className="h-4 w-4" />
               </button>
             </div>
           ) : (
-            <Link
-              href="/login"
-              className="rounded-md bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
-              Sign In
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/login"
+                className="hidden sm:inline-flex text-sm font-bold text-brand-navy hover:text-brand-orange transition-colors px-3 py-2"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/login"
+                className="inline-flex items-center gap-2 rounded-full bg-brand-orange px-5 sm:px-6 py-2.5 text-sm font-bold text-white shadow-orange hover:bg-brand-orange-hover hover:scale-[1.02] active:scale-[0.98] transition-all"
+              >
+                <span>Enter Academy</span>
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
           )}
         </div>
       </div>

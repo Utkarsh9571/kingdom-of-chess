@@ -1,6 +1,14 @@
 import type { Metadata } from 'next';
+import { Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
 import Providers from './providers';
+
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700', '800'],
+  variable: '--font-sans',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'Kingdom of Chess — Live Tournament Platform',
@@ -13,8 +21,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className="min-h-screen bg-background text-foreground antialiased">
+    <html lang="en" className={jakarta.variable}>
+      <body className="min-h-screen bg-background text-foreground antialiased font-sans selection:bg-brand-orange/20 selection:text-brand-navy">
         <Providers>{children}</Providers>
       </body>
     </html>

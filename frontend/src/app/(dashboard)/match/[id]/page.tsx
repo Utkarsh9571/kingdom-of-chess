@@ -1,17 +1,28 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Chessboard } from 'react-chessboard';
+import {
+  Clock,
+  Swords,
+  Trophy,
+  ArrowLeft,
+  AlertCircle,
+  Shield,
+  Zap,
+  CheckCircle2,
+  User,
+  Crown,
+} from 'lucide-react';
 import { api, MatchDetails } from '@/lib/api';
 import { Navbar } from '@/components/Navbar';
 import { useSocket } from '@/context/SocketContext';
 
 export default function MatchArenaPage() {
   const params = useParams();
-  const router = useRouter();
   const id = params?.id as string;
 
   const { socket, isConnected } = useSocket();
@@ -85,7 +96,6 @@ export default function MatchArenaPage() {
   }, [socket, isConnected, id]);
 
   const activeMatch = matchState || initialMatch;
-
   const boardOrientation = userColor === 'black' ? 'black' : 'white';
 
   const formatClock = (ms?: number) => {
@@ -96,194 +106,232 @@ export default function MatchArenaPage() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const isMyTurn =
+    (userColor === 'white' && activeMatch?.activeTurn === 'w') ||
+    (userColor === 'black' && activeMatch?.activeTurn === 'b');
+
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-brand-cream flex flex-col selection:bg-brand-orange/20 selection:text-brand-navy">
       <Navbar />
 
-      <main className="container mx-auto flex-1 p-4 sm:p-6 space-y-6 max-w-6xl">
+      <main className="container mx-auto flex-1 p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl">
         {/* Navigation & Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-brand-border pb-5">
           <div className="space-y-1">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 text-xs font-bold text-brand-text-muted">
               {activeMatch?.tournamentId ? (
                 <Link
                   href={`/student/tournaments/${activeMatch.tournamentId}`}
-                  className="hover:text-primary transition-colors flex items-center gap-1"
+                  className="hover:text-brand-orange transition-colors flex items-center gap-1.5"
                 >
-                  ← Back to Tournament Hub
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  <span>Back to Tournament Hub</span>
                 </Link>
               ) : (
-                <Link href="/student/tournaments" className="hover:text-primary transition-colors">
-                  ← Back to Tournaments
+                <Link
+                  href="/student/tournaments"
+                  className="hover:text-brand-orange transition-colors flex items-center gap-1.5"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  <span>Back to Tournaments</span>
                 </Link>
               )}
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-3">
-              <span>{activeMatch?.tournamentName || 'Live Chess Arena'}</span>
-              <span className="rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800 px-2.5 py-0.5 text-xs font-semibold uppercase">
-                {activeMatch?.status || 'in_progress'}
+
+            <div className="flex items-center gap-3 mt-1">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-brand-navy">
+                {activeMatch?.tournamentName || 'Live Chess Arena'}
+              </h1>
+              <span className="inline-flex items-center rounded-full bg-brand-teal-light px-3 py-1 text-xs font-extrabold text-brand-teal border border-brand-teal/30">
+                {activeMatch?.status === 'in_progress' ? 'Live In Progress' : activeMatch?.status}
               </span>
-            </h1>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium">
+            <div className="flex items-center gap-2 rounded-full border border-brand-border bg-white px-3.5 py-1.5 text-xs font-bold shadow-soft">
               <span
                 className={`h-2 w-2 rounded-full ${
-                  isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'
+                  isConnected ? 'bg-brand-green animate-pulse' : 'bg-destructive'
                 }`}
               />
-              <span className="text-muted-foreground">
+              <span className="text-brand-navy">
                 {isConnected ? 'Real-Time Connected' : 'Connecting...'}
               </span>
             </div>
-            <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 text-xs font-bold text-amber-400">
-              TimeControl: {activeMatch?.timeControl || '5+0'}
+
+            <div className="rounded-full bg-brand-orange-light border border-brand-orange/30 px-3.5 py-1.5 text-xs font-extrabold text-brand-orange shadow-sm">
+              Clock: {activeMatch?.timeControl || '5+0'}
             </div>
           </div>
         </div>
 
         {/* Error States */}
         {joinError && (
-          <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive flex items-center gap-3">
-            <span className="text-xl">🚫</span>
+          <div className="rounded-2xl border border-destructive/30 bg-brand-pink-light p-4 text-xs font-bold text-destructive flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 shrink-0" />
             <div>
-              <div className="font-bold">Access Denied</div>
+              <div className="font-extrabold">Access Denied</div>
               <div>{joinError}</div>
             </div>
           </div>
         )}
 
         {isError && !joinError && (
-          <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+          <div className="rounded-2xl border border-destructive/30 bg-brand-pink-light p-4 text-xs font-bold text-destructive">
             Failed to load match: {(error as Error)?.message}
           </div>
         )}
 
         {/* Arena Body */}
         {!isLoading && activeMatch && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Chessboard Column */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* LEFT / PRIMARY AREA: Chessboard Column */}
             <div className="lg:col-span-8 flex flex-col items-center space-y-4">
               {/* Opponent Card (Top) */}
-              <div className="w-full max-w-[560px] rounded-xl border border-border bg-card p-3.5 flex items-center justify-between shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-800 text-lg border border-zinc-700">
+              <div className="w-full max-w-[560px] rounded-2xl border border-brand-border bg-white p-4 flex items-center justify-between shadow-soft">
+                <div className="flex items-center gap-3.5">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-cream-dark text-brand-navy text-xl border border-brand-border font-bold">
                     {boardOrientation === 'white' ? '♚' : '♔'}
                   </div>
                   <div>
-                    <div className="font-semibold text-sm text-foreground">
+                    <div className="font-bold text-sm text-brand-navy">
                       {boardOrientation === 'white'
                         ? activeMatch.blackPlayer?.name || 'Player Black'
                         : activeMatch.whitePlayer?.name || 'Player White'}
                     </div>
-                    <div className="text-[11px] text-muted-foreground">
+                    <div className="text-[11px] font-semibold text-brand-text-muted">
                       {boardOrientation === 'white' ? 'Playing Black' : 'Playing White'}
                     </div>
                   </div>
                 </div>
-                <div className="rounded-lg bg-zinc-900 border border-zinc-800 px-3.5 py-1.5 font-mono text-base font-bold text-foreground">
-                  {boardOrientation === 'white'
-                    ? formatClock(activeMatch.blackTimeRemainingMs)
-                    : formatClock(activeMatch.whiteTimeRemainingMs)}
+
+                <div className="flex items-center gap-3">
+                  {!isMyTurn && (
+                    <span className="hidden sm:inline-block rounded-full bg-brand-orange-light px-2.5 py-0.5 text-[10px] font-bold text-brand-orange border border-brand-orange/30 animate-pulse">
+                      Active Turn
+                    </span>
+                  )}
+                  <div className="rounded-xl bg-brand-cream border border-brand-border px-4 py-2 font-mono text-lg font-extrabold text-brand-navy shadow-inner">
+                    {boardOrientation === 'white'
+                      ? formatClock(activeMatch.blackTimeRemainingMs)
+                      : formatClock(activeMatch.whiteTimeRemainingMs)}
+                  </div>
                 </div>
               </div>
 
               {/* Dedicated Chessboard Container */}
-              <div className="w-full max-w-[560px] aspect-square rounded-2xl overflow-hidden border-2 border-border shadow-2xl bg-zinc-900 flex items-center justify-center">
-                <Chessboard
-                  position={activeMatch.currentFen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'}
-                  boardOrientation={boardOrientation}
-                  arePiecesDraggable={false}
-                  customBoardStyle={{
-                    borderRadius: '8px',
-                    boxShadow: '0 5px 15px rgba(0, 0, 0, 0.5)',
-                  }}
-                  customDarkSquareStyle={{ backgroundColor: '#779952' }}
-                  customLightSquareStyle={{ backgroundColor: '#edeed1' }}
-                />
+              <div className="w-full max-w-[560px] aspect-square rounded-3xl overflow-hidden border-4 border-white shadow-soft-lg bg-white flex items-center justify-center p-1.5 sm:p-2">
+                <div className="w-full h-full rounded-2xl overflow-hidden border border-brand-border/60">
+                  <Chessboard
+                    position={
+                      activeMatch.currentFen ||
+                      'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+                    }
+                    boardOrientation={boardOrientation}
+                    arePiecesDraggable={false}
+                    customBoardStyle={{
+                      borderRadius: '12px',
+                    }}
+                    customDarkSquareStyle={{ backgroundColor: '#B88B4A' }}
+                    customLightSquareStyle={{ backgroundColor: '#F0D9B5' }}
+                  />
+                </div>
               </div>
 
               {/* Current Player Card (Bottom) */}
-              <div className="w-full max-w-[560px] rounded-xl border border-amber-500/30 bg-card p-3.5 flex items-center justify-between shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/20 text-lg border border-amber-500/40 text-amber-300">
+              <div className="w-full max-w-[560px] rounded-2xl border-2 border-brand-orange/40 bg-white p-4 flex items-center justify-between shadow-soft">
+                <div className="flex items-center gap-3.5">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-orange-light text-brand-orange text-xl border border-brand-orange/30 font-bold shadow-sm">
                     {boardOrientation === 'white' ? '♔' : '♚'}
                   </div>
                   <div>
-                    <div className="font-semibold text-sm text-foreground flex items-center gap-2">
+                    <div className="font-extrabold text-sm text-brand-navy flex items-center gap-2">
                       <span>
                         {boardOrientation === 'white'
                           ? activeMatch.whitePlayer?.name || 'Player White (You)'
                           : activeMatch.blackPlayer?.name || 'Player Black (You)'}
                       </span>
-                      <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-300 uppercase">
+                      <span className="rounded-full bg-brand-orange px-2 py-0.5 text-[10px] font-extrabold text-white uppercase tracking-wider">
                         YOU
                       </span>
                     </div>
-                    <div className="text-[11px] text-muted-foreground">
-                      {boardOrientation === 'white' ? 'Playing White (Bottom)' : 'Playing Black (Bottom)'}
+                    <div className="text-[11px] font-semibold text-brand-text-muted">
+                      {boardOrientation === 'white'
+                        ? 'Playing White (Bottom)'
+                        : 'Playing Black (Bottom)'}
                     </div>
                   </div>
                 </div>
-                <div className="rounded-lg bg-zinc-900 border border-amber-500/30 px-3.5 py-1.5 font-mono text-base font-bold text-amber-300">
-                  {boardOrientation === 'white'
-                    ? formatClock(activeMatch.whiteTimeRemainingMs)
-                    : formatClock(activeMatch.blackTimeRemainingMs)}
+
+                <div className="flex items-center gap-3">
+                  {isMyTurn && (
+                    <span className="hidden sm:inline-block rounded-full bg-brand-orange px-2.5 py-0.5 text-[10px] font-extrabold text-white animate-pulse">
+                      Your Turn!
+                    </span>
+                  )}
+                  <div className="rounded-xl bg-brand-orange-light border border-brand-orange/30 px-4 py-2 font-mono text-lg font-extrabold text-brand-orange shadow-inner">
+                    {boardOrientation === 'white'
+                      ? formatClock(activeMatch.whiteTimeRemainingMs)
+                      : formatClock(activeMatch.blackTimeRemainingMs)}
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Sidebar / Match Details */}
-            <div className="lg:col-span-4 space-y-4">
-              <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-                <h3 className="font-bold text-base text-foreground flex items-center justify-between">
-                  <span>Match Information</span>
-                  <span className="text-xs font-mono text-muted-foreground">
+            {/* RIGHT / SECONDARY AREA: Sidebar / Match Details */}
+            <div className="lg:col-span-4 space-y-6 w-full">
+              <div className="rounded-3xl border border-brand-border bg-white p-6 sm:p-7 space-y-5 shadow-soft">
+                <div className="flex items-center justify-between border-b border-brand-border pb-4">
+                  <h3 className="font-extrabold text-lg text-brand-navy">Match Information</h3>
+                  <span className="text-xs font-mono font-bold text-brand-text-muted">
                     #{activeMatch.id?.slice(0, 8)}
                   </span>
-                </h3>
+                </div>
 
-                <div className="space-y-2 text-xs border-y border-border py-3">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tournament</span>
-                    <span className="font-medium text-foreground">{activeMatch.tournamentName}</span>
+                <div className="space-y-3 text-xs">
+                  <div className="flex justify-between py-1 border-b border-brand-border/60">
+                    <span className="font-semibold text-brand-text-muted">Tournament</span>
+                    <span className="font-bold text-brand-navy">{activeMatch.tournamentName}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Your Color</span>
-                    <span className="font-bold text-amber-400 capitalize">{userColor}</span>
+                  <div className="flex justify-between py-1 border-b border-brand-border/60">
+                    <span className="font-semibold text-brand-text-muted">Your Color</span>
+                    <span className="font-extrabold text-brand-orange capitalize">{userColor}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Match Status</span>
-                    <span className="font-semibold text-emerald-400 capitalize">
+                  <div className="flex justify-between py-1 border-b border-brand-border/60">
+                    <span className="font-semibold text-brand-text-muted">Match Status</span>
+                    <span className="font-bold text-brand-teal capitalize">
                       {activeMatch.status?.replace('_', ' ')}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Turn</span>
-                    <span className="font-semibold text-foreground">
+                  <div className="flex justify-between py-1">
+                    <span className="font-semibold text-brand-text-muted">Turn</span>
+                    <span className="font-extrabold text-brand-navy">
                       {activeMatch.activeTurn === 'w' ? 'White to move' : 'Black to move'}
                     </span>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="text-xs font-semibold text-muted-foreground">PGN Move History</div>
-                  <div className="rounded-lg bg-zinc-900 border border-zinc-800 p-3 min-h-[140px] text-xs font-mono text-zinc-300">
+                {/* PGN / Move History Area */}
+                <div className="space-y-2 pt-2">
+                  <div className="text-xs font-bold text-brand-navy uppercase tracking-wider">
+                    PGN Move History
+                  </div>
+                  <div className="rounded-2xl bg-brand-cream border border-brand-border p-4 min-h-[140px] text-xs font-mono text-brand-navy leading-relaxed">
                     {activeMatch.pgn ? (
                       <p className="whitespace-pre-wrap">{activeMatch.pgn}</p>
                     ) : (
-                      <div className="h-full flex items-center justify-center text-muted-foreground text-center py-8">
-                        Auto-paired! Live game engine starts in Phase 5.
+                      <div className="h-full flex items-center justify-center text-brand-text-muted text-center py-8 font-medium">
+                        Paired & synchronized. Moves will record here during play.
                       </div>
                     )}
                   </div>
                 </div>
 
                 <div className="pt-2">
-                  <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-300 flex items-center gap-2">
-                    <span>✓</span>
-                    <span>Matched and synchronized in real-time over Socket.IO.</span>
+                  <div className="rounded-2xl bg-brand-teal-light border border-brand-teal/30 p-3.5 text-xs font-bold text-brand-teal flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    <span>Real-time Socket.IO room connected</span>
                   </div>
                 </div>
               </div>
