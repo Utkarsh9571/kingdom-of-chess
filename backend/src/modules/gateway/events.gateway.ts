@@ -33,17 +33,18 @@ function parseCookie(cookieString: string | undefined): Record<string, string> {
 @WebSocketGateway({
   cors: {
     origin: (requestOrigin: string, callback: (err: Error | null, allow?: boolean) => void) => {
-      const allowed = [
+      const allowedOrigins = [
         process.env.FRONTEND_URL,
         'http://localhost:3000',
         'http://127.0.0.1:3000',
       ].filter(Boolean) as string[];
 
-      if (!requestOrigin || allowed.includes(requestOrigin)) {
+      if (!requestOrigin || allowedOrigins.includes(requestOrigin)) {
         callback(null, true);
-      } else {
-        callback(null, true); // Allow configured frontend domain with credentials
+        return;
       }
+
+      callback(new Error('Origin not allowed by CORS'));
     },
     credentials: true,
   },
@@ -94,11 +95,8 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       const cookieHeader = client.handshake.headers.cookie;
       const parsedCookies = parseCookie(cookieHeader);
 
-      // Support token from cookie or handshake auth/query
-      const token =
-        parsedCookies.jwt ||
-        client.handshake.auth?.token ||
-        (client.handshake.query?.token as string);
+      // Authenticate exclusively via httpOnly JWT cookie
+      const token = parsedCookies.jwt;
 
       if (!token) {
         console.warn(`[Socket] Connection rejected: No token found for client ${client.id}`);
@@ -463,10 +461,7 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
   async handleAuthRefresh(client: Socket) {
     try {
       const parsedCookies = parseCookie(client.handshake.headers.cookie);
-      const token =
-        parsedCookies.jwt ||
-        client.handshake.auth?.token ||
-        (client.handshake.query?.token as string);
+      const token = parsedCookies.jwt;
 
       if (!token) {
         client.emit('auth:error', { message: 'Authentication required' });

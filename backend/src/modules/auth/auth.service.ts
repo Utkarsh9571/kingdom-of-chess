@@ -75,7 +75,7 @@ export class AuthService {
     response.cookie('jwt', token, {
       httpOnly: true,
       secure: isProduction,
-      sameSite: 'lax',
+      sameSite: isProduction ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: '/',
     });
@@ -91,9 +91,11 @@ export class AuthService {
   }
 
   logout(response: Response) {
+    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
     response.clearCookie('jwt', {
       httpOnly: true,
-      sameSite: 'lax',
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
       path: '/',
     });
 

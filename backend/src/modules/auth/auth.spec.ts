@@ -276,7 +276,7 @@ describe('Authentication & Authorization Suite', () => {
   });
 
   describe('5. Public Student Registration & Security (AuthService.register)', () => {
-    it('should register a new user as STUDENT and return auth token', async () => {
+    it('should register a new user as STUDENT and issue an httpOnly authentication cookie', async () => {
       const mockResponse: any = { cookie: jest.fn() };
       const res = await authService.register(
         { name: 'Praggnanandhaa R.', email: 'pragg@kingdom.com', password: 'Password123!' },

@@ -251,7 +251,7 @@ All REST API endpoints are prefixed with `/api/v1` and follow standardized JSON 
 
 ## Socket.IO Event Catalog
 
-The WebSocket gateway authenticates connections on the handshake using the JWT cookie or auth token. Sockets join private `user:{userId}` rooms for direct messages and `match:{matchId}` rooms during games.
+The WebSocket gateway authenticates connections on the handshake exclusively using the secure `httpOnly` JWT cookie. Sockets join private `user:{userId}` rooms for direct messages and `match:{matchId}` rooms during games.
 
 | Event Name | Direction | Payload | Description |
 | :--- | :---: | :--- | :--- |
