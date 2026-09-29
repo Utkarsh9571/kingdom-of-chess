@@ -96,6 +96,10 @@ export default function MatchArenaPage() {
   const [showResignModal, setShowResignModal] = useState(false);
   const [isResigning, setIsResigning] = useState(false);
 
+  // Optimistic UI state: immediate local piece move while awaiting authoritative server confirmation
+  const [optimisticFen, setOptimisticFen] = useState<string | null>(null);
+  const [isPendingMove, setIsPendingMove] = useState(false);
+
   // Click-to-move square selection state
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [possibleMoves, setPossibleMoves] = useState<string[]>([]);
@@ -132,20 +136,33 @@ export default function MatchArenaPage() {
 
   const activeMatch = matchState || initialMatch;
 
-  // Normalized authoritative FEN string
-  const currentFen = useMemo(() => {
+  // Active board FEN: optimistic move takes visual priority, falling back to authoritative server FEN
+  const displayFen = useMemo(() => {
     return (
+      optimisticFen ||
       activeMatch?.currentFen ||
       (activeMatch as any)?.fen ||
       'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
     );
-  }, [activeMatch?.currentFen, (activeMatch as any)?.fen]);
+  }, [optimisticFen, activeMatch?.currentFen, (activeMatch as any)?.fen]);
 
-  // Clear piece selection whenever position advances
+  // Clear piece selection whenever displayed position advances
   useEffect(() => {
     setSelectedSquare(null);
     setPossibleMoves([]);
-  }, [currentFen]);
+  }, [displayFen]);
+
+  // Safety reconciliation timeout: if an optimistic move stays pending > 5s, reconcile with server state
+  useEffect(() => {
+    if (!isPendingMove) return;
+    const timeout = setTimeout(() => {
+      setIsPendingMove(false);
+      setOptimisticFen(null);
+      setMoveError('Move rejected');
+      setTimeout(() => setMoveError(null), 2500);
+    }, 5000);
+    return () => clearTimeout(timeout);
+  }, [isPendingMove]);
 
   // Local ticker for live clocks while in_progress
   useEffect(() => {
@@ -166,6 +183,8 @@ export default function MatchArenaPage() {
     const handleMatchJoined = (data: any) => {
       console.log('[Socket] Successfully joined match room:', data);
       setJoinError(null);
+      setIsPendingMove(false);
+      setOptimisticFen(null);
       if (data.color === 'w') setUserColor('white');
       else if (data.color === 'b') setUserColor('black');
       else if (data.color === 'observer') setUserColor('observer');
@@ -179,6 +198,8 @@ export default function MatchArenaPage() {
 
     const handleMatchState = (data: any) => {
       console.log('[Socket] Received match:state update:', data);
+      setIsPendingMove(false);
+      setOptimisticFen(null);
       setMatchState((prev) => ({
         ...prev,
         ...data,
@@ -188,7 +209,10 @@ export default function MatchArenaPage() {
     };
 
     const handleMatchMoved = (data: any) => {
-      console.log('[Socket] Received match:moved event:', data);
+      console.log('[Socket] Received authoritative match:moved event:', data);
+      // Seamlessly reconcile: server FEN matches optimistic move; clear pending flags with zero visual jump
+      setIsPendingMove(false);
+      setOptimisticFen(null);
       setMatchState((prev) => ({
         ...prev,
         ...data,
@@ -199,6 +223,8 @@ export default function MatchArenaPage() {
 
     const handleMatchEnded = (data: any) => {
       console.log('[Socket] Received match:ended event:', data);
+      setIsPendingMove(false);
+      setOptimisticFen(null);
       setMatchState((prev) => ({
         ...prev,
         status: 'completed',
@@ -215,8 +241,11 @@ export default function MatchArenaPage() {
     const handleMatchError = (err: { code: string; message: string }) => {
       console.error('[Socket] Match room error:', err);
       if (err.code === 'INVALID_MOVE' || err.code === 'MOVE_ERROR') {
-        setMoveError(err.message || 'Illegal or rejected move');
-        setTimeout(() => setMoveError(null), 4000);
+        // Rollback optimistic move on server rejection to restore authoritative board position
+        setIsPendingMove(false);
+        setOptimisticFen(null);
+        setMoveError('Move rejected');
+        setTimeout(() => setMoveError(null), 2500);
       } else {
         setJoinError(err.message || 'Failed to join match room');
       }
@@ -264,39 +293,40 @@ export default function MatchArenaPage() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Only allow move when active turn matches player color AND no optimistic move is pending
   const isMyTurn =
+    !isPendingMove &&
     activeMatch?.status === 'in_progress' &&
     ((userColor === 'white' && activeMatch?.activeTurn === 'w') ||
       (userColor === 'black' && activeMatch?.activeTurn === 'b'));
 
-  // Common move execution logic for both Drag-and-Drop and Click-to-Move
+  // Common optimistic move execution for Drag-and-Drop and Click-to-Move
   const executeMove = (from: string, to: string, pieceStr?: string): boolean => {
     if (!socket || !id) return false;
 
+    // Prevent duplicate moves while awaiting server confirmation
+    if (isPendingMove) return false;
+
     if (activeMatch?.status !== 'in_progress') {
-      setMoveError('This match has ended. Pieces cannot be moved.');
-      setTimeout(() => setMoveError(null), 3500);
+      setMoveError('Move rejected');
+      setTimeout(() => setMoveError(null), 2500);
       return false;
     }
 
     if (userColor !== 'white' && userColor !== 'black') {
-      setMoveError('Observers and coaches cannot make moves in player matches.');
-      setTimeout(() => setMoveError(null), 3500);
+      setMoveError('Move rejected');
+      setTimeout(() => setMoveError(null), 2500);
       return false;
     }
 
     if (!isMyTurn) {
-      const waitingMsg =
-        userColor === 'black' && activeMatch?.activeTurn === 'w'
-          ? "It is White's turn to move first! (You are playing Black)"
-          : `It is currently ${activeMatch?.activeTurn === 'w' ? 'White' : 'Black'}'s turn to move.`;
-      setMoveError(waitingMsg);
-      setTimeout(() => setMoveError(null), 3500);
+      setMoveError('Move rejected');
+      setTimeout(() => setMoveError(null), 2500);
       return false;
     }
 
     try {
-      const chess = new Chess(currentFen);
+      const chess = new Chess(displayFen);
       const pieceOnBoard = chess.get(from as any);
       if (!pieceOnBoard) return false;
 
@@ -305,12 +335,12 @@ export default function MatchArenaPage() {
         (userColor === 'white' && pieceOnBoard.color !== 'w') ||
         (userColor === 'black' && pieceOnBoard.color !== 'b')
       ) {
-        setMoveError(`You are playing ${userColor}. You can only move your own pieces.`);
-        setTimeout(() => setMoveError(null), 3500);
+        setMoveError('Illegal move');
+        setTimeout(() => setMoveError(null), 2500);
         return false;
       }
 
-      // Detect pawn promotion
+      // Detect pawn promotion (auto-queen)
       const isPawn = pieceOnBoard.type === 'p';
       const isPromotion =
         isPawn &&
@@ -318,7 +348,7 @@ export default function MatchArenaPage() {
           (pieceOnBoard.color === 'b' && to.endsWith('1')));
       const promotion = isPromotion ? 'q' : undefined;
 
-      // Test move validity locally
+      // Test move validity locally with chess.js
       const validMove = chess.move({
         from: from as any,
         to: to as any,
@@ -326,12 +356,21 @@ export default function MatchArenaPage() {
       });
 
       if (!validMove) {
-        setMoveError('Illegal chess move.');
-        setTimeout(() => setMoveError(null), 3000);
+        setMoveError('Illegal move');
+        setTimeout(() => setMoveError(null), 2500);
         return false;
       }
 
-      // Legal move verified: emit authoritative socket event
+      // OPTIMISTIC UPDATE:
+      // Immediately render piece at destination square using the new FEN
+      const nextFen = chess.fen();
+      setOptimisticFen(nextFen);
+      setIsPendingMove(true);
+      setSelectedSquare(null);
+      setPossibleMoves([]);
+      setMoveError(null);
+
+      // Transmit to authoritative server for backend validation & broadcast
       socket.emit('match:move', {
         matchId: id,
         from,
@@ -339,36 +378,25 @@ export default function MatchArenaPage() {
         promotion,
       });
 
-      setSelectedSquare(null);
-      setPossibleMoves([]);
-      setMoveError(null);
       return true;
     } catch {
-      setMoveError('Invalid move attempt.');
-      setTimeout(() => setMoveError(null), 3000);
+      setMoveError('Illegal move');
+      setTimeout(() => setMoveError(null), 2500);
       return false;
     }
   };
 
   // Click-to-Move Handler
   const onSquareClick = (square: string) => {
-    if (activeMatch?.status !== 'in_progress') {
-      setMoveError('Match is completed. Pieces cannot be moved.');
-      setTimeout(() => setMoveError(null), 3500);
-      return;
-    }
+    if (activeMatch?.status !== 'in_progress' || isPendingMove) return;
 
     if (!isMyTurn) {
-      const msg =
-        userColor === 'black' && activeMatch?.activeTurn === 'w'
-          ? "It is White's turn to move first! (You are playing Black)"
-          : `Waiting for opponent (${activeMatch?.activeTurn === 'w' ? 'White' : 'Black'}) to move.`;
-      setMoveError(msg);
-      setTimeout(() => setMoveError(null), 3500);
+      setMoveError('Move rejected');
+      setTimeout(() => setMoveError(null), 2500);
       return;
     }
 
-    const chess = new Chess(currentFen);
+    const chess = new Chess(displayFen);
     const piece = chess.get(square as any);
 
     // Case 1: Square was already selected
@@ -393,7 +421,7 @@ export default function MatchArenaPage() {
         return;
       }
 
-      // Attempt move to destination square
+      // Attempt optimistic move to destination square
       const moved = executeMove(selectedSquare, square);
       if (!moved) {
         setSelectedSquare(null);
@@ -410,8 +438,8 @@ export default function MatchArenaPage() {
       (userColor === 'black' && piece.color === 'b');
 
     if (!isOwnPiece) {
-      setMoveError(`You are playing ${userColor} — please select your own pieces.`);
-      setTimeout(() => setMoveError(null), 3000);
+      setMoveError('Illegal move');
+      setTimeout(() => setMoveError(null), 2500);
       return;
     }
 
@@ -422,8 +450,7 @@ export default function MatchArenaPage() {
 
   // Drag-and-drop piece filter
   const isDraggablePiece = ({ piece }: { piece: string }) => {
-    if (activeMatch?.status !== 'in_progress') return false;
-    // Allow dragging user's own pieces so that turns & rules are validated with friendly instant feedback
+    if (activeMatch?.status !== 'in_progress' || isPendingMove) return false;
     if (userColor === 'white' && piece.startsWith('w')) return true;
     if (userColor === 'black' && piece.startsWith('b')) return true;
     return false;
@@ -457,7 +484,7 @@ export default function MatchArenaPage() {
 
     // 3. Highlight king in check
     try {
-      const chess = new Chess(currentFen);
+      const chess = new Chess(displayFen);
       if (chess.isCheck()) {
         const turn = chess.turn();
         const board = chess.board();
@@ -479,7 +506,7 @@ export default function MatchArenaPage() {
     } catch {}
 
     return styles;
-  }, [selectedSquare, possibleMoves, currentFen]);
+  }, [selectedSquare, possibleMoves, displayFen]);
 
   const handleResign = () => {
     if (!socket || !id || isResigning) return;
@@ -490,7 +517,7 @@ export default function MatchArenaPage() {
     });
   };
 
-  // Parse moves from PGN
+  // Parse moves from authoritative PGN
   const parsedMoves = useMemo(() => parsePgnToMoves(activeMatch?.pgn), [activeMatch?.pgn]);
 
   // Determine game-end card details
@@ -720,7 +747,7 @@ export default function MatchArenaPage() {
                           <span className="text-brand-orange font-black">Your Turn!</span>
                           <span className="text-[11px] font-semibold text-brand-text-muted flex items-center gap-1">
                             <MousePointerClick className="h-3 w-3" />
-                            Drag piece or click to select &amp; move
+                            Drag piece or click to move
                           </span>
                         </>
                       ) : (
@@ -768,13 +795,14 @@ export default function MatchArenaPage() {
               <div className="w-full max-w-[560px] aspect-square rounded-3xl overflow-hidden border-4 border-white shadow-soft-lg bg-white flex items-center justify-center p-1.5 sm:p-2">
                 <div className="w-full h-full rounded-2xl overflow-hidden border border-brand-border/60">
                   <Chessboard
-                    position={currentFen}
+                    position={displayFen}
                     boardOrientation={boardOrientation}
-                    arePiecesDraggable={activeMatch.status === 'in_progress'}
+                    arePiecesDraggable={activeMatch.status === 'in_progress' && !isPendingMove}
                     isDraggablePiece={isDraggablePiece}
                     onPieceDrop={onPieceDrop}
                     onSquareClick={onSquareClick}
                     customSquareStyles={customSquareStyles}
+                    animationDuration={150}
                     customBoardStyle={{
                       borderRadius: '12px',
                     }}
