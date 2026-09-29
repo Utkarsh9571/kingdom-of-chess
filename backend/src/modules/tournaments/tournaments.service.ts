@@ -53,43 +53,40 @@ export class TournamentsService {
   }
 
   async findAll(role: 'COACH' | 'STUDENT', userId: string) {
-    let query;
-    if (role === 'COACH') {
-      query = await this.db
-        .select()
-        .from(schema.tournaments)
-        .orderBy(desc(schema.tournaments.createdAt));
-    } else {
-      // Students can browse open, ongoing, and completed tournaments (never draft)
-      query = await this.db
-        .select()
-        .from(schema.tournaments)
-        .where(inArray(schema.tournaments.status, ['open', 'ongoing', 'completed']))
-        .orderBy(desc(schema.tournaments.createdAt));
-    }
+    const whereClause =
+      role === 'COACH'
+        ? undefined
+        : inArray(schema.tournaments.status, ['open', 'ongoing', 'completed']);
 
-    // Attach participant counts and enrollment status
-    const tournamentsWithStats = await Promise.all(
-      query.map(async (t) => {
-        const participants = await this.db
-          .select({
-            id: schema.tournamentParticipants.id,
-            userId: schema.tournamentParticipants.userId,
-          })
-          .from(schema.tournamentParticipants)
-          .where(eq(schema.tournamentParticipants.tournamentId, t.id));
+    const rows = await this.db
+      .select({
+        id: schema.tournaments.id,
+        name: schema.tournaments.name,
+        timeControl: schema.tournaments.timeControl,
+        initialTimeSeconds: schema.tournaments.initialTimeSeconds,
+        incrementSeconds: schema.tournaments.incrementSeconds,
+        startDate: schema.tournaments.startDate,
+        status: schema.tournaments.status,
+        winnerId: schema.tournaments.winnerId,
+        createdById: schema.tournaments.createdById,
+        createdAt: schema.tournaments.createdAt,
+        updatedAt: schema.tournaments.updatedAt,
+        participantsCount: sql<number>`count(${schema.tournamentParticipants.id})::int`,
+        isEnrolled: sql<boolean>`bool_or(${schema.tournamentParticipants.userId} = ${userId})`,
+      })
+      .from(schema.tournaments)
+      .leftJoin(
+        schema.tournamentParticipants,
+        eq(schema.tournaments.id, schema.tournamentParticipants.tournamentId),
+      )
+      .where(whereClause)
+      .groupBy(schema.tournaments.id)
+      .orderBy(desc(schema.tournaments.createdAt));
 
-        const isEnrolled = participants.some((p) => p.userId === userId);
-
-        return {
-          ...t,
-          participantsCount: participants.length,
-          isEnrolled,
-        };
-      }),
-    );
-
-    return tournamentsWithStats;
+    return rows.map((r) => ({
+      ...r,
+      isEnrolled: Boolean(r.isEnrolled),
+    }));
   }
 
   async findById(id: string, role: 'COACH' | 'STUDENT', userId: string) {

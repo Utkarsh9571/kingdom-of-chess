@@ -96,23 +96,24 @@ export class MatchesService implements OnModuleDestroy {
       throw new ForbiddenException('You are not authorized to view this match');
     }
 
-    const [tournament] = await this.db
-      .select()
-      .from(schema.tournaments)
-      .where(eq(schema.tournaments.id, match.tournamentId))
-      .limit(1);
-
-    const [whiteUser] = await this.db
-      .select({ id: schema.users.id, name: schema.users.name, email: schema.users.email })
-      .from(schema.users)
-      .where(eq(schema.users.id, match.whitePlayerId))
-      .limit(1);
-
-    const [blackUser] = await this.db
-      .select({ id: schema.users.id, name: schema.users.name, email: schema.users.email })
-      .from(schema.users)
-      .where(eq(schema.users.id, match.blackPlayerId))
-      .limit(1);
+    // Parallelize independent metadata queries
+    const [[tournament], [whiteUser], [blackUser]] = await Promise.all([
+      this.db
+        .select()
+        .from(schema.tournaments)
+        .where(eq(schema.tournaments.id, match.tournamentId))
+        .limit(1),
+      this.db
+        .select({ id: schema.users.id, name: schema.users.name, email: schema.users.email })
+        .from(schema.users)
+        .where(eq(schema.users.id, match.whitePlayerId))
+        .limit(1),
+      this.db
+        .select({ id: schema.users.id, name: schema.users.name, email: schema.users.email })
+        .from(schema.users)
+        .where(eq(schema.users.id, match.blackPlayerId))
+        .limit(1),
+    ]);
 
     // If match is in progress, ensure timeout timer is actively ticking on the server
     if (match.status === 'in_progress') {

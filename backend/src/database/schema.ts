@@ -66,6 +66,7 @@ export const matches = pgTable('matches', {
 }, (table) => [
   index('match_tournament_idx').on(table.tournamentId),
   index('match_status_idx').on(table.status),
+  index('match_tournament_status_idx').on(table.tournamentId, table.status),
   index('match_white_player_idx').on(table.whitePlayerId),
   index('match_black_player_idx').on(table.blackPlayerId),
   uniqueIndex('unique_active_white_player').on(table.whitePlayerId).where(sql`status = 'in_progress'`),
