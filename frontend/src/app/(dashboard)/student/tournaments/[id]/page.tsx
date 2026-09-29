@@ -475,13 +475,8 @@ export default function StudentTournamentDetailsPage() {
                     </div>
                   )}
 
-                  <div className="text-[11px] text-brand-text-muted font-medium pt-2 flex items-center justify-between border-t border-brand-border/60">
-                    <span>
-                      * Tiebreak Order: Total Points → Most Wins → Matches Played → Player Name.
-                    </span>
-                    <span className="font-bold text-brand-navy">
-                      Competition Ranking (1, 2, 2, 4)
-                    </span>
+                  <div className="text-[11px] text-brand-text-muted font-medium pt-2 border-t border-brand-border/60">
+                    * Tiebreak Order: Total Points → Most Wins → Matches Played → Player Name
                   </div>
                 </div>
               )}
