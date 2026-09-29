@@ -712,9 +712,9 @@ export default function MatchArenaPage() {
         {!isLoading && !isUnauthorized && activeMatch && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             {/* LEFT / PRIMARY AREA: Chessboard Column */}
-            <div className="lg:col-span-8 flex flex-col items-center space-y-4">
+            <div className="lg:col-span-8 flex flex-col items-center space-y-4 w-full">
               {/* Opponent Card (Top) */}
-              <div className="w-full max-w-[560px] rounded-2xl border border-brand-border bg-white p-4 flex items-center justify-between shadow-soft">
+              <div className="w-full max-w-[560px] rounded-2xl border border-brand-border bg-white p-3.5 sm:p-4 flex items-center justify-between shadow-soft">
                 <div className="flex items-center gap-3.5">
                   <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-cream-dark text-brand-navy text-xl border border-brand-border font-bold">
                     {boardOrientation === 'white' ? '♚' : '♔'}
