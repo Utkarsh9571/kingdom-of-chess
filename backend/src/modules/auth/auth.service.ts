@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
@@ -6,6 +6,7 @@ import * as bcrypt from 'bcryptjs';
 import { UsersService } from '../users/users.service';
 import { User } from '../../database/schema';
 import { JwtPayload } from '../../common/guards/jwt-auth.guard';
+import { RegisterDto } from './dto/register.dto';
 
 @Injectable()
 export class AuthService {
@@ -14,6 +15,27 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {}
+
+  async register(registerDto: RegisterDto, response: Response) {
+    const normalizedEmail = registerDto.email.toLowerCase().trim();
+
+    const existingUser = await this.usersService.findByEmail(normalizedEmail);
+    if (existingUser) {
+      throw new ConflictException('An account with this email address already exists');
+    }
+
+    const passwordHash = await bcrypt.hash(registerDto.password, 10);
+
+    // CRITICAL SECURITY: Public registration MUST ONLY create STUDENT accounts.
+    const newUser = await this.usersService.create({
+      name: registerDto.name.trim(),
+      email: normalizedEmail,
+      passwordHash,
+      role: 'STUDENT',
+    });
+
+    return this.login(newUser, response);
+  }
 
   async validateUser(email: string, pass: string): Promise<User> {
     const user = await this.usersService.findByEmail(email);

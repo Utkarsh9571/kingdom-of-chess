@@ -26,4 +26,23 @@ export class UsersService {
 
     return results[0] || null;
   }
+
+  async create(data: {
+    name: string;
+    email: string;
+    passwordHash: string;
+    role?: 'STUDENT' | 'COACH';
+  }): Promise<schema.User> {
+    const [user] = await this.db
+      .insert(schema.users)
+      .values({
+        name: data.name.trim(),
+        email: data.email.toLowerCase().trim(),
+        passwordHash: data.passwordHash,
+        role: data.role || 'STUDENT',
+      })
+      .returning();
+
+    return user;
+  }
 }

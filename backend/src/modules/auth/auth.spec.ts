@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UnauthorizedException, ForbiddenException, ExecutionContext } from '@nestjs/common';
+import { UnauthorizedException, ForbiddenException, ConflictException, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -49,6 +49,14 @@ describe('Authentication & Authorization Suite', () => {
       if (id === mockStudent.id) return mockStudent;
       return null;
     }),
+    create: jest.fn(async (data: any) => ({
+      id: '33333333-3333-3333-3333-333333333333',
+      name: data.name,
+      email: data.email,
+      passwordHash: data.passwordHash,
+      role: data.role || 'STUDENT',
+      createdAt: new Date(),
+    })),
   };
 
   const mockConfigService = {
@@ -265,6 +273,50 @@ describe('Authentication & Authorization Suite', () => {
       } as unknown as ExecutionContext;
 
       expect(() => rolesGuard.canActivate(mockContext)).toThrow(ForbiddenException);
+    });
+  });
+
+  describe('5. Public Student Registration & Security (AuthService.register)', () => {
+    it('should register a new user as STUDENT and return auth token', async () => {
+      const mockResponse: any = { cookie: jest.fn() };
+      const res = await authService.register(
+        { name: 'Praggnanandhaa R.', email: 'pragg@kingdom.com', password: 'Password123!' },
+        mockResponse,
+      );
+
+      expect(res.user).toBeDefined();
+      expect(res.user.name).toBe('Praggnanandhaa R.');
+      expect(res.user.email).toBe('pragg@kingdom.com');
+      expect(res.user.role).toBe('STUDENT');
+      expect(res.token).toBeDefined();
+      expect(mockResponse.cookie).toHaveBeenCalledWith('jwt', expect.any(String), expect.anything());
+    });
+
+    it('should reject registration if email already exists with ConflictException (409)', async () => {
+      const mockResponse: any = { cookie: jest.fn() };
+      await expect(
+        authService.register(
+          { name: 'Duplicate User', email: 'coach@kingdom.com', password: 'Password123!' },
+          mockResponse,
+        ),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('CRITICAL SECURITY: Public registration MUST force role=STUDENT even if attacker passes role=COACH', async () => {
+      const mockResponse: any = { cookie: jest.fn() };
+      // Pass malicious role in payload (simulating manual API call bypassing frontend)
+      const maliciousPayload: any = {
+        name: 'Attacker Coach',
+        email: 'attacker@kingdom.com',
+        password: 'Password123!',
+        role: 'COACH',
+      };
+
+      const res = await authService.register(maliciousPayload, mockResponse);
+      expect(res.user.role).toBe('STUDENT');
+      expect(mockUsersService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ role: 'STUDENT' }),
+      );
     });
   });
 });

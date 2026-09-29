@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Crown, User, ArrowRight, AlertCircle, Sparkles } from 'lucide-react';
+import { Crown, ArrowRight, AlertCircle } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useSocket } from '@/context/SocketContext';
 
@@ -12,8 +12,8 @@ export default function LoginPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const [email, setEmail] = useState('coach@kingdom.com');
-  const [password, setPassword] = useState('Password123!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const { reconnectSocket } = useSocket();
@@ -38,12 +38,6 @@ export default function LoginPage() {
     e.preventDefault();
     setErrorMessage(null);
     loginMutation.mutate({ email, password });
-  };
-
-  const handleQuickFill = (userEmail: string) => {
-    setEmail(userEmail);
-    setPassword('Password123!');
-    setErrorMessage(null);
   };
 
   return (
@@ -76,67 +70,6 @@ export default function LoginPage() {
 
         {/* Main Card */}
         <div className="rounded-3xl border border-brand-border bg-white p-6 sm:p-8 shadow-soft-md space-y-6">
-          {/* Quick-fill accounts panel */}
-          <div className="rounded-2xl border border-brand-border/80 bg-brand-cream/60 p-4 space-y-2.5">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-brand-navy uppercase tracking-wider">
-              <Sparkles className="h-3.5 w-3.5 text-brand-orange" />
-              <span>One-Click Development Logins</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => handleQuickFill('coach@kingdom.com')}
-                className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-left font-bold transition-all ${
-                  email === 'coach@kingdom.com'
-                    ? 'border-brand-navy bg-brand-navy text-white shadow-sm'
-                    : 'border-brand-border bg-white text-brand-navy hover:border-brand-navy/30 hover:bg-brand-cream'
-                }`}
-              >
-                <Crown className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-                <span className="truncate">Coach Garry</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickFill('student1@kingdom.com')}
-                className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-left font-bold transition-all ${
-                  email === 'student1@kingdom.com'
-                    ? 'border-brand-teal bg-brand-teal text-white shadow-sm'
-                    : 'border-brand-border bg-white text-brand-navy hover:border-brand-teal/30 hover:bg-brand-cream'
-                }`}
-              >
-                <User className="h-3.5 w-3.5 text-brand-teal shrink-0" />
-                <span className="truncate">Priyal M.</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickFill('student2@kingdom.com')}
-                className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-left font-bold transition-all ${
-                  email === 'student2@kingdom.com'
-                    ? 'border-brand-teal bg-brand-teal text-white shadow-sm'
-                    : 'border-brand-border bg-white text-brand-navy hover:border-brand-teal/30 hover:bg-brand-cream'
-                }`}
-              >
-                <User className="h-3.5 w-3.5 text-brand-teal shrink-0" />
-                <span className="truncate">Utkarsh S.</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickFill('student3@kingdom.com')}
-                className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-left font-bold transition-all ${
-                  email === 'student3@kingdom.com'
-                    ? 'border-brand-teal bg-brand-teal text-white shadow-sm'
-                    : 'border-brand-border bg-white text-brand-navy hover:border-brand-teal/30 hover:bg-brand-cream'
-                }`}
-              >
-                <User className="h-3.5 w-3.5 text-brand-teal shrink-0" />
-                <span className="truncate">Gukesh D.</span>
-              </button>
-            </div>
-          </div>
-
           {/* Error Banner */}
           {errorMessage && (
             <div className="rounded-xl border border-destructive/30 bg-brand-pink-light p-3.5 text-xs font-semibold text-destructive flex items-center gap-2">
@@ -195,7 +128,10 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-brand-text-muted font-medium">
-          New to the academy? Contact your coach or administrator.
+          Don&apos;t have an account?{' '}
+          <Link href="/register" className="font-bold text-brand-orange hover:underline">
+            Register
+          </Link>
         </p>
       </div>
     </div>
