@@ -44,22 +44,10 @@ export interface TournamentDetails extends Tournament {
   participants: Participant[];
 }
 
-export interface AuthResponse {
-  token?: string;
-  user: UserProfile;
-}
-
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers || {});
   if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
-  }
-
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('token');
-    if (token && !headers.has('Authorization')) {
-      headers.set('Authorization', `Bearer ${token}`);
-    }
   }
 
   const response = await fetch(`${API_URL}${endpoint}`, {
@@ -80,36 +68,22 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
 export const api = {
   // Auth
-  register: async (data: { name: string; email: string; password: string }) => {
-    const res = await request<AuthResponse>('/auth/register', {
+  register: (data: { name: string; email: string; password: string }) =>
+    request<{ user: UserProfile }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
-    });
-    if (res.token && typeof window !== 'undefined') {
-      localStorage.setItem('token', res.token);
-    }
-    return res;
-  },
+    }),
 
-  login: async (credentials: { email: string; password: string }) => {
-    const res = await request<AuthResponse>('/auth/login', {
+  login: (credentials: { email: string; password: string }) =>
+    request<{ user: UserProfile }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
-    });
-    if (res.token && typeof window !== 'undefined') {
-      localStorage.setItem('token', res.token);
-    }
-    return res;
-  },
+    }),
 
-  logout: async () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('token');
-    }
-    return request<{ message: string }>('/auth/logout', {
+  logout: () =>
+    request<{ message: string }>('/auth/logout', {
       method: 'POST',
-    });
-  },
+    }),
 
   getMe: () => request<UserProfile>('/me'),
 

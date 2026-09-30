@@ -99,14 +99,8 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       const cookieHeader = client.handshake.headers.cookie;
       const parsedCookies = parseCookie(cookieHeader);
 
-      // Extract token from handshake auth, Authorization header, query param, or httpOnly cookie
-      const headerAuth = client.handshake.headers?.authorization;
-      const bearerToken = headerAuth && headerAuth.startsWith('Bearer ') ? headerAuth.substring(7) : undefined;
-      const handshakeToken = typeof client.handshake.auth?.token === 'string' ? client.handshake.auth.token : undefined;
-      const queryToken = typeof client.handshake.query?.token === 'string' ? client.handshake.query.token : undefined;
-      const cookieToken = parsedCookies.jwt;
-
-      const token = handshakeToken || bearerToken || queryToken || cookieToken;
+      // Authenticate exclusively via httpOnly JWT cookie
+      const token = parsedCookies.jwt;
 
       if (!token) {
         console.warn(`[Socket] Connection rejected: No token found for client ${client.id}`);
