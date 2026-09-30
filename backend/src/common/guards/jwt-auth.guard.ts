@@ -59,15 +59,20 @@ export class JwtAuthGuard implements CanActivate {
   }
 
   private extractTokenFromRequest(request: Request): string | null {
-    // 1. Check httpOnly cookie
+    // 1. Check Authorization Bearer header
+    const authHeader = request.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      return authHeader.substring(7);
+    }
+
+    // 2. Check httpOnly cookie
     if (request.cookies && request.cookies.jwt) {
       return request.cookies.jwt;
     }
 
-    // 2. Check Authorization Bearer header
-    const authHeader = request.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      return authHeader.substring(7);
+    // 3. Check query string token
+    if (typeof request.query?.token === 'string') {
+      return request.query.token;
     }
 
     return null;
