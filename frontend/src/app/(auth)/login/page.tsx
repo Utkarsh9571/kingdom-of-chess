@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Crown, ArrowRight, AlertCircle } from 'lucide-react';
+import { Crown, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useSocket } from '@/context/SocketContext';
 
@@ -14,6 +14,7 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const { reconnectSocket } = useSocket();
@@ -99,15 +100,25 @@ export default function LoginPage() {
               <label className="text-xs font-bold text-brand-navy" htmlFor="password">
                 Password
               </label>
-              <input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-xl border border-brand-border bg-brand-cream/30 px-3.5 py-2.5 text-sm text-brand-navy font-medium placeholder:text-brand-text-muted/60 focus:border-brand-orange focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-orange/20 transition-all"
-                placeholder="••••••••"
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full rounded-xl border border-brand-border bg-brand-cream/30 pl-3.5 pr-10 py-2.5 text-sm text-brand-navy font-medium placeholder:text-brand-text-muted/60 focus:border-brand-orange focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-orange/20 transition-all"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-muted hover:text-brand-navy focus:outline-none p-1 rounded-md transition-colors"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
 
             <button

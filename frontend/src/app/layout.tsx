@@ -13,6 +13,9 @@ const jakarta = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   title: 'Kingdom of Chess — Live Tournament Platform',
   description: 'Online live chess tournaments and 1-on-1 matches for kids in India',
+  icons: {
+    icon: '/icon.svg',
+  },
 };
 
 export default function RootLayout({

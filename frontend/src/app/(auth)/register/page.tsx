@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Crown, ArrowRight, AlertCircle } from 'lucide-react';
+import { Crown, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useSocket } from '@/context/SocketContext';
 
@@ -17,6 +17,8 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const registerMutation = useMutation({
@@ -125,32 +127,52 @@ export default function RegisterPage() {
               <label htmlFor="password" className="block text-sm font-semibold text-slate-700 mb-1.5">
                 Password
               </label>
-              <input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                disabled={registerMutation.isPending}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition text-slate-900 placeholder:text-slate-400 text-sm"
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  disabled={registerMutation.isPending}
+                  className="w-full pl-4 pr-10 py-2.5 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition text-slate-900 placeholder:text-slate-400 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 focus:outline-none p-1 rounded-md transition-colors"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-semibold text-slate-700 mb-1.5">
                 Confirm Password
               </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="••••••••"
-                disabled={registerMutation.isPending}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition text-slate-900 placeholder:text-slate-400 text-sm"
-              />
+              <div className="relative">
+                <input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  disabled={registerMutation.isPending}
+                  className="w-full pl-4 pr-10 py-2.5 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition text-slate-900 placeholder:text-slate-400 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 focus:outline-none p-1 rounded-md transition-colors"
+                  aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                >
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <button
